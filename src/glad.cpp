@@ -38,6 +38,8 @@ PFNGLUNIFORMMATRIX3FVPROC glad_glUniformMatrix3fv = nullptr;
 PFNGLUNIFORMMATRIX4FVPROC glad_glUniformMatrix4fv = nullptr;
 PFNGLACTIVETEXTUREPROC glad_glActiveTexture = nullptr;
 PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap = nullptr;
+PFNGLDRAWELEMENTSINSTANCEDPROC glad_glDrawElementsInstanced = nullptr;
+PFNGLVERTEXATTRIBDIVISORPROC glad_glVertexAttribDivisor = nullptr;
 
 static void* loadProc(const char* name) {
 #ifdef _WIN32
@@ -90,6 +92,8 @@ int gladLoadGL() {
     glad_glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC)loadProc("glUniformMatrix4fv");
     glad_glActiveTexture = (PFNGLACTIVETEXTUREPROC)loadProc("glActiveTexture");
     glad_glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)loadProc("glGenerateMipmap");
+    glad_glDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDPROC)loadProc("glDrawElementsInstanced");
+    glad_glVertexAttribDivisor = (PFNGLVERTEXATTRIBDIVISORPROC)loadProc("glVertexAttribDivisor");
     
     // Return success if critical functions loaded
     return glad_glGenVertexArrays != nullptr && glad_glCreateShader != nullptr;

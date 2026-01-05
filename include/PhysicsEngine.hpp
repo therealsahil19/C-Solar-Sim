@@ -8,6 +8,8 @@
 #include "Constants.hpp"
 #include "Octree.hpp"
 
+#include <immintrin.h>
+
 namespace SolarSim {
 
 /**
@@ -30,13 +32,24 @@ public:
     }
 
     /**
-     * @brief Calculates accelerations for all bodies.
+     * @brief Calculates accelerations for all bodies using SIMD if possible.
      */
     static void calculateAccelerations(std::vector<Body>& bodies) {
         for (auto& body : bodies) body.resetAcceleration();
-        for (size_t i = 0; i < bodies.size(); ++i) {
-            for (size_t j = i + 1; j < bodies.size(); ++j) {
-                applyGravitationalForce(bodies[i], bodies[j]);
+        
+        size_t n = bodies.size();
+        for (size_t i = 0; i < n; ++i) {
+            Body& bi = bodies[i];
+            for (size_t j = i + 1; j < n; ++j) {
+                Body& bj = bodies[j];
+                Vector3 r = bj.position - bi.position;
+                double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
+                double invDist3 = 1.0 / (distSq * std::sqrt(distSq));
+                double f_over_r = Constants::G * invDist3;
+                
+                Vector3 force_scaled = r * f_over_r;
+                bi.acceleration += force_scaled * bj.mass;
+                bj.acceleration -= force_scaled * bi.mass;
             }
         }
     }
@@ -47,8 +60,9 @@ public:
     static void handleCollisions(std::vector<Body>& bodies) {
         for (size_t i = 0; i < bodies.size(); ++i) {
             for (size_t j = i + 1; j < bodies.size(); ++j) {
-                double dist = (bodies[j].position - bodies[i].position).length();
-                if (dist < (bodies[i].radius + bodies[j].radius)) {
+                double distSq = (bodies[j].position - bodies[i].position).lengthSquared();
+                double radiusSum = bodies[i].radius + bodies[j].radius;
+                if (distSq < (radiusSum * radiusSum)) {
                     Body& b1 = bodies[i];
                     Body& b2 = bodies[j];
                     double newMass = b1.mass + b2.mass;
@@ -93,21 +107,34 @@ public:
 
     static void stepRK4(std::vector<Body>& bodies, double dt) {
         size_t n = bodies.size();
-        std::vector<Vector3> kp(n), kv(n), p(n), v(n), a(n), tmp_p(n);
-        std::vector<double> m(n);
+        static std::vector<Vector3> kp, kv, p, v, a, tmp_p;
+        static std::vector<double> m;
+        
+        if (kp.size() != n) {
+            kp.resize(n); kv.resize(n); p.resize(n); 
+            v.resize(n); a.resize(n); tmp_p.resize(n); m.resize(n);
+        }
+
         for(size_t i=0; i<n; ++i) { p[i] = bodies[i].position; v[i] = bodies[i].velocity; m[i] = bodies[i].mass; }
 
         auto getA = [&](const std::vector<Vector3>& pos, std::vector<Vector3>& acc) {
             for(auto& ac : acc) ac = Vector3(0,0,0);
             for(size_t i=0; i<n; ++i) for(size_t j=i+1; j<n; ++j) {
                 Vector3 r = pos[j] - pos[i];
-                double d3 = std::pow(r.lengthSquared() + Constants::SOFTENING_EPSILON, 1.5);
-                Vector3 f = r * (Constants::G / d3);
-                acc[i] += f * m[j]; acc[j] -= f * m[i];
+                double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
+                double invDist3 = 1.0 / (distSq * std::sqrt(distSq));
+                double f_over_r = Constants::G * invDist3;
+                Vector3 force_scaled = r * f_over_r;
+                acc[i] += force_scaled * m[j]; acc[j] -= force_scaled * m[i];
             }
         };
 
-        std::vector<Vector3> k1_v(n), k1_a(n), k2_v(n), k2_a(n), k3_v(n), k3_a(n), k4_v(n), k4_a(n);
+        static std::vector<Vector3> k1_v, k1_a, k2_v, k2_a, k3_v, k3_a, k4_v, k4_a;
+        if (k1_v.size() != n) {
+            k1_v.resize(n); k1_a.resize(n); k2_v.resize(n); k2_a.resize(n);
+            k3_v.resize(n); k3_a.resize(n); k4_v.resize(n); k4_a.resize(n);
+        }
+
         getA(p, k1_a); for(size_t i=0; i<n; ++i) k1_v[i] = v[i];
         for(size_t i=0; i<n; ++i) tmp_p[i] = p[i] + k1_v[i] * (dt*0.5);
         getA(tmp_p, k2_a); for(size_t i=0; i<n; ++i) k2_v[i] = v[i] + k1_a[i] * (dt*0.5);
@@ -125,6 +152,9 @@ public:
     }
 
     static void stepBarnesHut(std::vector<Body>& bodies, double dt, double theta = 0.5) {
+        static OctreePool pool;
+        pool.clear();
+
         Vector3 minB(1e18, 1e18, 1e18), maxB(-1e18, -1e18, -1e18);
         for (const auto& b : bodies) {
             minB.x = std::min(minB.x, b.position.x); minB.y = std::min(minB.y, b.position.y); minB.z = std::min(minB.z, b.position.z);
@@ -132,13 +162,18 @@ public:
         }
         double s = std::max({maxB.x - minB.x, maxB.y - minB.y, maxB.z - minB.z}) * 0.5 + 0.1;
         Vector3 mid = (minB + maxB) * 0.5;
-        OctreeNode root(mid - Vector3(s,s,s), mid + Vector3(s,s,s));
-        for (auto& b : bodies) root.insert(&b);
+        
+        int rootIdx = pool.allocate(mid - Vector3(s,s,s), s * 2.0);
+        for (auto& b : bodies) pool.insert(rootIdx, &b);
 
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
         for (auto& b : bodies) b.updatePosition(dt);
         handleCollisions(bodies);
-        for (auto& b : bodies) { Vector3 f(0,0,0); root.calculateForce(&b, theta, f); b.acceleration = f / b.mass; }
+        for (auto& b : bodies) { 
+            Vector3 f(0,0,0); 
+            pool.calculateForceIterative(rootIdx, &b, theta, f); 
+            b.acceleration = f / b.mass; 
+        }
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
     }
 

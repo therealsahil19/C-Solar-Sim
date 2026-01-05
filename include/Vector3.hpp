@@ -3,15 +3,23 @@
 #include <cmath>
 #include <iostream>
 
+#ifdef _MSC_VER
+#define ALIGN_AS(n) __declspec(align(n))
+#else
+#define ALIGN_AS(n) __attribute__((aligned(n)))
+#endif
+
 namespace SolarSim {
 
 /**
  * @brief A simple 3D vector struct for physics calculations.
+ * Aligned for potential SIMD optimization.
  */
-struct Vector3 {
+struct ALIGN_AS(16) Vector3 {
     double x, y, z;
+    double padding; // Ensure 32-byte alignment for 2 doubles or 16-byte for future-proofing
 
-    Vector3(double x = 0.0, double y = 0.0, double z = 0.0) : x(x), y(y), z(z) {}
+    Vector3(double x = 0.0, double y = 0.0, double z = 0.0) : x(x), y(y), z(z), padding(0.0) {}
 
     // Vector operations
     Vector3 operator+(const Vector3& other) const {

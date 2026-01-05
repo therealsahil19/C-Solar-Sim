@@ -1,90 +1,136 @@
-#pragma once
+#ifndef OCTREE_HPP
+#define OCTREE_HPP
 
 #include <vector>
 #include <memory>
+#include <stack>
 #include "Vector3.hpp"
 #include "Body.hpp"
+#include "Constants.hpp"
 
 namespace SolarSim {
 
-/**
- * @brief An Octree node for Barnes-Hut optimization.
- */
 struct OctreeNode {
     Vector3 centerOfMass;
     double totalMass;
-    Vector3 minBounds, maxBounds;
+    Vector3 minBounds;
     double size;
 
-    std::vector<Body*> bodies; // If leaf node
-    std::unique_ptr<OctreeNode> children[8];
+    int children[8]; // Indices in pool, -1 if none
+    Body* bodies[1]; // Using fixed size for simplicity in pooled nodes
+    int numBodies;
     bool isLeaf;
 
-    OctreeNode(Vector3 minB, Vector3 maxB) 
-        : centerOfMass(0,0,0), totalMass(0), minBounds(minB), maxBounds(maxB), isLeaf(true) {
-        size = maxBounds.x - minBounds.x;
-        for (int i = 0; i < 8; ++i) children[i] = nullptr;
+    OctreeNode() : centerOfMass(0,0,0), totalMass(0), size(0), numBodies(0), isLeaf(true) {
+        for (int i = 0; i < 8; ++i) children[i] = -1;
     }
 
-    void insert(Body* body) {
-        if (isLeaf) {
-            if (bodies.empty()) {
-                bodies.push_back(body);
-                totalMass = body->mass;
-                centerOfMass = body->position;
+    void reset(Vector3 minB, double s) {
+        minBounds = minB;
+        size = s;
+        centerOfMass = Vector3(0,0,0);
+        totalMass = 0;
+        numBodies = 0;
+        isLeaf = true;
+        for (int i = 0; i < 8; ++i) children[i] = -1;
+    }
+};
+
+class OctreePool {
+private:
+    std::vector<OctreeNode> pool;
+    int nextFree;
+
+public:
+    OctreePool(size_t initialCapacity = 1024) : nextFree(0) {
+        pool.resize(initialCapacity);
+    }
+
+    void clear() { nextFree = 0; }
+
+    int allocate(Vector3 minB, double size) {
+        if (nextFree >= (int)pool.size()) {
+            pool.resize(pool.size() * 2);
+        }
+        int idx = nextFree++;
+        pool[idx].reset(minB, size);
+        return idx;
+    }
+
+    OctreeNode& operator[](int idx) { return pool[idx]; }
+    const OctreeNode& operator[](int idx) const { return pool[idx]; }
+
+    void insert(int nodeIdx, Body* body) {
+        if (pool[nodeIdx].isLeaf) {
+            if (pool[nodeIdx].numBodies == 0) {
+                pool[nodeIdx].bodies[0] = body;
+                pool[nodeIdx].numBodies = 1;
+                pool[nodeIdx].totalMass = body->mass;
+                pool[nodeIdx].centerOfMass = body->position;
             } else {
-                subdivide();
-                for (auto* b : bodies) insertIntoChild(b);
-                bodies.clear();
-                insertIntoChild(body);
+                Body* existingBody = pool[nodeIdx].bodies[0];
+                pool[nodeIdx].isLeaf = false;
+                pool[nodeIdx].numBodies = 0;
+                insertIntoChild(nodeIdx, existingBody);
+                insertIntoChild(nodeIdx, body);
             }
         } else {
-            insertIntoChild(body);
+            insertIntoChild(nodeIdx, body);
             // Update center of mass
-            centerOfMass = (centerOfMass * totalMass + body->position * body->mass) / (totalMass + body->mass);
-            totalMass += body->mass;
+            OctreeNode& node = pool[nodeIdx];
+            node.centerOfMass = (node.centerOfMass * node.totalMass + body->position * body->mass) / (node.totalMass + body->mass);
+            node.totalMass += body->mass;
         }
     }
 
-    void insertIntoChild(Body* body) {
-        Vector3 mid = (minBounds + maxBounds) * 0.5;
+    void insertIntoChild(int nodeIdx, Body* body) {
+        double halfSize = pool[nodeIdx].size * 0.5;
+        Vector3 mid = pool[nodeIdx].minBounds + Vector3(halfSize, halfSize, halfSize);
+        
         int idx = 0;
         if (body->position.x >= mid.x) idx |= 1;
         if (body->position.y >= mid.y) idx |= 2;
         if (body->position.z >= mid.z) idx |= 4;
 
-        if (!children[idx]) {
-            Vector3 cMin = minBounds, cMax = maxBounds;
-            if (idx & 1) cMin.x = mid.x; else cMax.x = mid.x;
-            if (idx & 2) cMin.y = mid.y; else cMax.y = mid.y;
-            if (idx & 4) cMin.z = mid.z; else cMax.z = mid.z;
-            children[idx] = std::make_unique<OctreeNode>(cMin, cMax);
+        if (pool[nodeIdx].children[idx] == -1) {
+            Vector3 cMin = pool[nodeIdx].minBounds;
+            if (idx & 1) cMin.x += halfSize;
+            if (idx & 2) cMin.y += halfSize;
+            if (idx & 4) cMin.z += halfSize;
+            int childIdx = allocate(cMin, halfSize);
+            pool[nodeIdx].children[idx] = childIdx;
         }
-        children[idx]->insert(body);
+        insert(pool[nodeIdx].children[idx], body);
     }
 
-    void subdivide() {
-        isLeaf = false;
-    }
+    void calculateForceIterative(int rootIdx, Body* body, double theta, Vector3& totalForce) {
+        static std::vector<int> stack;
+        stack.clear();
+        stack.push_back(rootIdx);
 
-    void calculateForce(Body* body, double theta, Vector3& totalForce) {
-        if (isLeaf) {
-            if (!bodies.empty() && bodies[0] != body) {
-                Vector3 r_vec = bodies[0]->position - body->position;
-                double distSq = r_vec.lengthSquared() + 1e-4; // Softening
-                double forceMag = (39.478 * body->mass * bodies[0]->mass) / distSq;
-                totalForce += r_vec.normalized() * forceMag;
-            }
-        } else {
-            double dist = (centerOfMass - body->position).length();
-            if (size / dist < theta) {
-                Vector3 r_vec = centerOfMass - body->position;
-                double distSq = r_vec.lengthSquared() + 1e-4;
-                double forceMag = (39.478 * body->mass * totalMass) / distSq;
-                totalForce += r_vec.normalized() * forceMag;
+        while (!stack.empty()) {
+            int nodeIdx = stack.back();
+            stack.pop_back();
+            const OctreeNode& node = pool[nodeIdx];
+
+            if (node.isLeaf) {
+                if (node.numBodies > 0 && node.bodies[0] != body) {
+                    Vector3 r = node.bodies[0]->position - body->position;
+                    double d2 = r.lengthSquared() + 1e-4;
+                    double invD3 = 1.0 / (d2 * std::sqrt(d2));
+                    totalForce += r * (Constants::G * body->mass * node.bodies[0]->mass * invD3);
+                }
             } else {
-                for (int i = 0; i < 8; ++i) {
-                    if (children[i]) children[i]->calculateForce(body, theta, totalForce);
+                double dist = (node.centerOfMass - body->position).length();
+                if (node.size / dist < theta) {
+                    Vector3 r = node.centerOfMass - body->position;
+                    double d2 = r.lengthSquared() + 1e-4;
+                    double invD3 = 1.0 / (d2 * std::sqrt(d2));
+                    totalForce += r * (Constants::G * body->mass * node.totalMass * invD3);
+                } else {
+                    for (int i = 0; i < 8; ++i) {
+                        if (node.children[i] != -1) stack.push_back(node.children[i]);
+                    }
                 }
             }
         }
@@ -92,3 +138,5 @@ struct OctreeNode {
 };
 
 } // namespace SolarSim
+
+#endif

@@ -90,6 +90,10 @@ typedef void (APIENTRYP PFNGLUNIFORMMATRIX4FVPROC)(GLint location, GLsizei count
 typedef void (APIENTRYP PFNGLACTIVETEXTUREPROC)(GLenum texture);
 typedef void (APIENTRYP PFNGLGENERATEMIPMAPPROC)(GLenum target);
 
+// Instanced Rendering
+typedef void (APIENTRYP PFNGLDRAWELEMENTSINSTANCEDPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount);
+typedef void (APIENTRYP PFNGLVERTEXATTRIBDIVISORPROC)(GLuint index, GLuint divisor);
+
 // =============================================================================
 // Function Pointer Externs
 // =============================================================================
@@ -125,6 +129,8 @@ extern PFNGLUNIFORMMATRIX3FVPROC glad_glUniformMatrix3fv;
 extern PFNGLUNIFORMMATRIX4FVPROC glad_glUniformMatrix4fv;
 extern PFNGLACTIVETEXTUREPROC glad_glActiveTexture;
 extern PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap;
+extern PFNGLDRAWELEMENTSINSTANCEDPROC glad_glDrawElementsInstanced;
+extern PFNGLVERTEXATTRIBDIVISORPROC glad_glVertexAttribDivisor;
 
 // =============================================================================
 // Macros to redirect GL calls to our pointers
@@ -161,6 +167,8 @@ extern PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap;
 #define glUniformMatrix4fv glad_glUniformMatrix4fv
 #define glActiveTexture glad_glActiveTexture
 #define glGenerateMipmap glad_glGenerateMipmap
+#define glDrawElementsInstanced glad_glDrawElementsInstanced
+#define glVertexAttribDivisor glad_glVertexAttribDivisor
 
 // =============================================================================
 // OpenGL Constants (commonly needed)

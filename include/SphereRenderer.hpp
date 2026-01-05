@@ -130,6 +130,16 @@ public:
         glBindVertexArray(0);
     }
 
+    void bindVAO() const {
+        if (!initialized) return;
+        glBindVertexArray(VAO);
+    }
+
+    void drawInstanced(unsigned int count) const {
+        if (!initialized) return;
+        glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0, count);
+    }
+
     ~SphereRenderer() {
         if (VAO) glDeleteVertexArrays(1, &VAO);
         if (VBO) glDeleteBuffers(1, &VBO);

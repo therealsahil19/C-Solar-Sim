@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_definitions(-D_USE_MATH_DEFINES)
 
+if(MSVC)
+    add_compile_options(/O2 /arch:AVX2 /fp:fast)
+else()
+    add_compile_options(-O3 -mavx2 -ffast-math)
+endif()
+
 # =============================================================================
 # Vendored Dependencies (no FetchContent needed - all committed to external/)
 # =============================================================================
@@ -37,9 +43,17 @@ add_executable(SolarSim
     src/glad.cpp
 )
 
+add_executable(benchmark
+    src/benchmark.cpp
+)
+
 # GLM is header-only - include directories
 target_include_directories(SolarSim PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
+)
+
+target_include_directories(benchmark PRIVATE 
+    include
 )
 
 # Link all libraries

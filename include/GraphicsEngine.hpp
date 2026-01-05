@@ -40,6 +40,10 @@ private:
     // Trail rendering
     unsigned int trailVAO = 0, trailVBO = 0;
     
+    // Instanced rendering for asteroids
+    unsigned int asteroidInstanceVBO = 0;
+    std::vector<glm::mat4> asteroidMatrices;
+    
     // Lighting parameters
     float ambientStrength = 0.15f;
     float specularStrength = 0.3f;
@@ -135,6 +139,9 @@ public:
         // Create trail VAO/VBO
         glGenVertexArrays(1, &trailVAO);
         glGenBuffers(1, &trailVBO);
+
+        // Create asteroid instance VBO
+        glGenBuffers(1, &asteroidInstanceVBO);
         
         // Enable OpenGL features
         glEnable(GL_DEPTH_TEST);
@@ -193,9 +200,23 @@ public:
             drawTrails(bodies, view, projection);
         }
         
-        // Draw all bodies
+        // Draw all bodies (except asteroids, which are instanced)
+        asteroidMatrices.clear();
         for (const auto& body : bodies) {
+            if (body.name == "Asteroid") {
+                float visualRadius = 0.02f;
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3((float)body.position.x, (float)body.position.z, (float)body.position.y));
+                model = glm::scale(model, glm::vec3(visualRadius));
+                asteroidMatrices.push_back(model);
+                continue;
+            }
             drawBody(body, view, projection, camPos, lightPos);
+        }
+
+        // Render asteroids instanced
+        if (!asteroidMatrices.empty()) {
+            drawAsteroidsInstanced(view, projection, camPos, lightPos);
         }
         
         // Reset OpenGL state for ImGui
@@ -307,6 +328,44 @@ private:
         }
     }
     
+    void drawAsteroidsInstanced(const glm::mat4& view, const glm::mat4& projection,
+                                const glm::vec3& camPos, const glm::vec3& lightPos) {
+        planetShader.use();
+        planetShader.setMat4("view", view);
+        planetShader.setMat4("projection", projection);
+        planetShader.setVec3("objectColor", glm::vec3(0.6f, 0.6f, 0.61f));
+        planetShader.setBool("useTexture", false);
+        planetShader.setBool("isInstanced", true);
+        
+        planetShader.setVec3("lightPos", lightPos);
+        planetShader.setVec3("viewPos", camPos);
+        planetShader.setFloat("ambientStrength", ambientStrength);
+        planetShader.setFloat("specularStrength", specularStrength);
+        planetShader.setFloat("shininess", shininess);
+
+        // Update instance data
+        glBindBuffer(GL_ARRAY_BUFFER, asteroidInstanceVBO);
+        glBufferData(GL_ARRAY_BUFFER, asteroidMatrices.size() * sizeof(glm::mat4), asteroidMatrices.data(), GL_DYNAMIC_DRAW);
+
+        sphereRenderer.bindVAO();
+        
+        // Set up instance matrix attributes (location 3)
+        // A mat4 takes 4 attribute slots
+        for (int i = 0; i < 4; i++) {
+            glEnableVertexAttribArray(3 + i);
+            glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+            glVertexAttribDivisor(3 + i, 1);
+        }
+
+        sphereRenderer.drawInstanced((unsigned int)asteroidMatrices.size());
+
+        for (int i = 0; i < 4; i++) {
+            glDisableVertexAttribArray(3 + i);
+        }
+        planetShader.setBool("isInstanced", false);
+        glBindVertexArray(0);
+    }
+
     void drawAxes(const glm::mat4& view, const glm::mat4& projection) {
         trailShader.use();
         trailShader.setMat4("view", view);
