@@ -57,6 +57,11 @@ public:
         // UX Additions
         bool showHelp = false;
         std::vector<Toast> toasts;
+        
+        // 🎨 Palette Unleashed: Theme & A11y
+        bool darkMode = true;           // Theme toggle
+        bool isLoading = false;         // Loading state indicator
+        float loadingProgress = 0.0f;   // Progress 0.0-1.0
     };
 
     static SimulationState& getState() {
@@ -72,6 +77,41 @@ public:
     }
 
     /**
+     * @brief Apply theme colors based on dark/light mode.
+     */
+    static void applyTheme(bool darkMode) {
+        ImGuiStyle& style = ImGui::GetStyle();
+        
+        if (darkMode) {
+            style.Colors[ImGuiCol_WindowBg] = Theme::Surface;
+            style.Colors[ImGuiCol_TitleBg] = Theme::TitleBg;
+            style.Colors[ImGuiCol_TitleBgActive] = Theme::TitleBgActive;
+            style.Colors[ImGuiCol_FrameBg] = Theme::FrameBg;
+            style.Colors[ImGuiCol_Button] = Theme::Primary;
+            style.Colors[ImGuiCol_ButtonHovered] = Theme::PrimaryHover;
+            style.Colors[ImGuiCol_ButtonActive] = Theme::PrimaryActive;
+            style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        } else {
+            style.Colors[ImGuiCol_WindowBg] = Theme::Light::Surface;
+            style.Colors[ImGuiCol_TitleBg] = Theme::Light::TitleBg;
+            style.Colors[ImGuiCol_TitleBgActive] = Theme::Light::TitleBgActive;
+            style.Colors[ImGuiCol_FrameBg] = Theme::Light::FrameBg;
+            style.Colors[ImGuiCol_Button] = Theme::Light::Primary;
+            style.Colors[ImGuiCol_ButtonHovered] = Theme::Light::PrimaryHover;
+            style.Colors[ImGuiCol_ButtonActive] = Theme::Light::PrimaryActive;
+            style.Colors[ImGuiCol_Text] = Theme::Light::Text;
+        }
+        
+        // Common colors
+        style.Colors[ImGuiCol_SliderGrab] = Theme::SliderGrab;
+        style.Colors[ImGuiCol_CheckMark] = Theme::CheckboxActive;
+        
+        // A11y: Focus indicators (WCAG 2.1 AA)
+        style.Colors[ImGuiCol_NavHighlight] = Theme::FocusRing;
+        style.Colors[ImGuiCol_NavWindowingHighlight] = Theme::FocusRing;
+    }
+    
+    /**
      * @brief Initialize ImGui with SFML window.
      */
     static void init(sf::RenderWindow& window) {
@@ -85,16 +125,14 @@ public:
         style.FrameRounding = Theme::FrameRounding;
         style.GrabRounding = Theme::GrabRounding;
         style.ItemSpacing = ImVec2(Theme::ItemSpacingX, Theme::ItemSpacingY);
-
-        style.Colors[ImGuiCol_WindowBg] = Theme::Surface;
-        style.Colors[ImGuiCol_TitleBg] = Theme::TitleBg;
-        style.Colors[ImGuiCol_TitleBgActive] = Theme::TitleBgActive;
-        style.Colors[ImGuiCol_FrameBg] = Theme::FrameBg;
-        style.Colors[ImGuiCol_Button] = Theme::Primary;
-        style.Colors[ImGuiCol_ButtonHovered] = Theme::PrimaryHover;
-        style.Colors[ImGuiCol_ButtonActive] = Theme::PrimaryActive;
-        style.Colors[ImGuiCol_SliderGrab] = Theme::SliderGrab;
-        style.Colors[ImGuiCol_CheckMark] = Theme::CheckboxActive;
+        style.FramePadding = ImVec2(Theme::ButtonPaddingX, Theme::ButtonPaddingY);
+        
+        // Enable keyboard navigation
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        
+        // Apply initial dark theme
+        applyTheme(true);
     }
 
     /**
@@ -132,8 +170,17 @@ public:
 
         // Control Panel
         ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(280, 420), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Simulation Controls 🎨", nullptr, ImGuiWindowFlags_NoCollapse);
+        ImGui::SetNextWindowSize(ImVec2(290, 450), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Simulation Controls", nullptr, ImGuiWindowFlags_NoCollapse);
+        
+        // 🎨 Theme Toggle (A11y: visible, accessible)
+        ImGui::SameLine(ImGui::GetWindowWidth() - 45);
+        if (ImGui::Button(state.darkMode ? "#" : "O", ImVec2(28, 0))) {
+            state.darkMode = !state.darkMode;
+            applyTheme(state.darkMode);
+            addToast(state.darkMode ? "Dark Mode" : "Light Mode", ToastType::Info);
+        }
+        ImGui::SetItemTooltip("Toggle Dark/Light Theme");
 
         // Time Controls
         if (ImGui::CollapsingHeader("Time Controls", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -188,15 +235,25 @@ public:
         
         // Preset Scenarios
         if (ImGui::CollapsingHeader("Preset Scenarios")) {
-            if (ImGui::Button("Full Solar System")) state.presetRequest = 0;
-            ImGui::SameLine();
-            if (ImGui::Button("Inner Planets")) state.presetRequest = 1;
-            if (ImGui::Button("Outer Giants")) state.presetRequest = 2;
-            ImGui::SameLine();
-            if (ImGui::Button("Earth-Moon")) state.presetRequest = 3;
-            if (ImGui::Button("Binary Star Test")) state.presetRequest = 4;
-            
-            if (state.presetRequest >= 0) addToast("Loading preset...", ToastType::Info);
+            // Loading indicator
+            if (state.isLoading) {
+                ImGui::TextColored(Theme::Info, "Loading...");
+                ImGui::ProgressBar(state.loadingProgress, ImVec2(-1, 4));
+            } else {
+                if (ImGui::Button("Full Solar System", ImVec2(130, 0))) state.presetRequest = 0;
+                ImGui::SameLine();
+                if (ImGui::Button("Inner Planets", ImVec2(130, 0))) state.presetRequest = 1;
+                if (ImGui::Button("Outer Giants", ImVec2(130, 0))) state.presetRequest = 2;
+                ImGui::SameLine();
+                if (ImGui::Button("Earth-Moon", ImVec2(130, 0))) state.presetRequest = 3;
+                if (ImGui::Button("Binary Star Test", ImVec2(130, 0))) state.presetRequest = 4;
+                
+                if (state.presetRequest >= 0) {
+                    state.isLoading = true;
+                    state.loadingProgress = 0.0f;
+                    addToast("Loading preset...", ToastType::Info);
+                }
+            }
         }
         
         // Save/Load State
@@ -388,6 +445,9 @@ public:
         ImGui::SetNextWindowSize(ImVec2(270, 370), ImGuiCond_FirstUseEver);
         ImGui::Begin("Body Information", nullptr, ImGuiWindowFlags_NoCollapse);
         
+        // A11y: Keyboard navigation hints
+        ImGui::TextDisabled("Use Up/Down arrows to navigate");
+        
         if (ImGui::BeginCombo("Select Body", 
             state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
                 ? bodies[state.selectedBody].name.c_str() : "(none)")) {
@@ -404,6 +464,27 @@ public:
                 }
             }
             ImGui::EndCombo();
+        }
+        
+        // A11y: Keyboard body navigation (Up/Down when panel focused)
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive()) {
+            // Count non-asteroid bodies
+            int maxBody = -1;
+            for (int i = 0; i < (int)bodies.size(); ++i) {
+                if (bodies[i].name != "Asteroid") maxBody = i;
+            }
+            
+            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+                do {
+                    state.selectedBody = std::min(state.selectedBody + 1, maxBody);
+                } while (state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
+                         && bodies[state.selectedBody].name == "Asteroid");
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+                do {
+                    state.selectedBody = std::max(state.selectedBody - 1, -1);
+                } while (state.selectedBody >= 0 && bodies[state.selectedBody].name == "Asteroid");
+            }
         }
         
         ImGui::Separator();

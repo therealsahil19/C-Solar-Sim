@@ -162,6 +162,8 @@ int main() {
             guiState.presetRequest = -1;  // Reset request
             guiState.elapsedYears = 0.0f;
             guiState.selectedBody = -1;
+            guiState.isLoading = false;   // Reset loading state
+            guiState.loadingProgress = 1.0f;
             history.clear();
             SolarSim::GuiEngine::addToast(std::string("Loaded: ") + SolarSim::StateManager::getPresetName(preset), SolarSim::GuiEngine::ToastType::Success);
             std::cout << "Loaded preset: " << SolarSim::StateManager::getPresetName(preset) << std::endl;
