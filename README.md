@@ -48,8 +48,8 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Solar-Sim.git
-cd Solar-Sim
+git clone https://github.com/therealsahil19/C-Solar-Sim.git
+cd C-Solar-Sim
 
 # Standard Build
 mkdir build && cd build
@@ -57,12 +57,12 @@ cmake ..
 cmake --build .
 
 # Run
-./SolarSim  # Linux/macOS
-./Debug/SolarSim.exe # Windows (MSVC)
+./SolarSim               # Linux/macOS
+./Debug/SolarSim.exe     # Windows (MSVC)
 ```
 
 ### Windows-Specific Notes
-If using Visual Studio/MSVC:
+If using Visual Studio/MSVC, we recommend using PowerShell:
 1. Open PowerShell in the project root.
 2. Run `cmake -B build -G "Visual Studio 17 2022" -A x64`
 3. Run `cmake --build build --config Release`
@@ -119,7 +119,7 @@ Solar-Sim/
 │   ├── planet.vert/frag  # Planet rendering shaders
 │   ├── sun.frag          # Sun emission shader
 │   └── trail.vert/frag   # Orbital trail shaders
-├── textures/             # Planetary textures (add your own)
+├── textures/             # Planetary textures
 ├── data/
 │   └── system.csv        # Body configuration data
 └── CMakeLists.txt        # Build configuration
@@ -153,18 +153,21 @@ In these units, the gravitational constant G = 4π² ≈ 39.478.
 ## Troubleshooting
 
 ### "Failed to open shader file"
-Ensure the `shaders/` directory is co-located with the executable or that you are running from the project root.
+> [!IMPORTANT]
+> Shaders must be located in the `shaders/` directory relative to the current working directory.
+If running from an IDE (like VS Code or Visual Studio), ensure the "Working Directory" is set to the project root, or copy the `shaders/` and `textures/` folders to the directory where the `.exe` resides.
 
 ### "DLL Not Found"
-On Windows, CMake is configured to automatically copy required DLLs to the build folder. If they are missing, try re-running the build or manually copying them from the `_deps` folder within `build`.
+On Windows, CMake is configured to automatically copy required DLLs to the build folder. If they are missing:
+1. Re-run the CMake configure step.
+2. Manually copy DLLs from `build/_deps/<package>-build/` to the directory containing `SolarSim.exe`.
 
-### Simulation Crashes/Freezes
-- Ensure your GPU drivers support OpenGL 4.5.
-- Check `build_log.txt` for specific initialization errors.
+### White Spheres / Missing Textures
+Ensure the `textures/` folder is available in the working directory. The simulation expects `.jpg` or `.png` textures for each body.
 
 ## Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and verification procedures.
 
 ## License
 

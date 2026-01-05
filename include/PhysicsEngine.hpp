@@ -18,7 +18,13 @@ namespace SolarSim {
 class PhysicsEngine {
 public:
     /**
-     * @brief Calculates gravitational force between two bodies.
+     * @brief Calculates gravitational force between two bodies using Newton's Law of Universal Gravitation.
+     * 
+     * Formula: F = G * (m1 * m2) / r^2
+     * Acceleration a = F / m
+     * 
+     * @param a Body 1
+     * @param b Body 2
      */
     static void applyGravitationalForce(Body& a, Body& b) {
         Vector3 r_vec = b.position - a.position;
@@ -91,7 +97,12 @@ public:
     }
 
     /**
-     * @brief Detects and handles inelastic collisions.
+     * @brief Detects and handles inelastic collisions using momentum conservation.
+     * 
+     * When two bodies collide (distance < radius_sum), they merge into one.
+     * New mass M = m1 + m2
+     * New velocity V = (m1*v1 + m2*v2) / M
+     * New radius R = (r1^3 + r2^3)^(1/3)  -- Perserving volume
      */
     static void handleCollisions(std::vector<Body>& bodies) {
         for (size_t i = 0; i < bodies.size(); ++i) {
@@ -162,12 +173,12 @@ public:
      * 
      * RK4 provides a balance between computational cost and high-order accuracy.
      * It samples the derivatives at four points within the timestep:
-     * 1. k1: Initial state
-     * 2. k2: Midpoint using k1
-     * 3. k3: Midpoint using k2
-     * 4. k4: End of interval using k3
+     * 1. k1 = f(tn, yn)
+     * 2. k2 = f(tn + dt/2, yn + dt*k1/2)
+     * 3. k3 = f(tn + dt/2, yn + dt*k2/2)
+     * 4. k4 = f(tn + dt, yn + dt*k3)
      * 
-     * The final state is a weighted average of these samples: (k1 + 2*k2 + 2*k3 + k4) / 6.
+     * Final state: yn+1 = yn + (dt/6)(k1 + 2k2 + 2k3 + k4)
      * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years

@@ -22,3 +22,8 @@ Documentation standards and coverage logs.
 **Focus:** Infrastructure & Core Physics
 **Standard:** Doxygen for C++ headers.
 **Gap:** GUI Engine components still need detailed property documentation.
+
+## 2026-01-06 - [Docs Update]
+**Focus:** Project-wide Literacy & Maintenance
+**Standard:** GFM README, Doxygen Headers (Math-heavy).
+**Gap:** Octree and Shader internals could use deeper logic flow documentation.
