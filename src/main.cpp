@@ -91,6 +91,35 @@ int main() {
             if (event.type == sf::Event::Closed) {
                 window.close();
             }
+
+            // Global Hotkeys (only if not typing in ImGui)
+            if (!ImGui::GetIO().WantCaptureKeyboard) {
+                if (event.type == sf::Event::KeyPressed) {
+                    auto& state = SolarSim::GuiEngine::getState();
+                    
+                    if (event.key.code == sf::Keyboard::Space) {
+                        state.paused = !state.paused;
+                        SolarSim::GuiEngine::addToast(state.paused ? "Simulation Paused" : "Simulation Resumed", 
+                            state.paused ? SolarSim::GuiEngine::ToastType::Warning : SolarSim::GuiEngine::ToastType::Success);
+                    }
+                    else if (event.key.code == sf::Keyboard::T) {
+                        state.showTrails = !state.showTrails;
+                        SolarSim::GuiEngine::addToast(state.showTrails ? "Trails: ON" : "Trails: OFF", SolarSim::GuiEngine::ToastType::Info);
+                    }
+                    else if (event.key.code == sf::Keyboard::S) {
+                        state.requestSave = true;
+                        SolarSim::GuiEngine::addToast("Saving state...", SolarSim::GuiEngine::ToastType::Info);
+                    }
+                    else if (event.key.code == sf::Keyboard::L) {
+                        state.requestLoad = true;
+                        SolarSim::GuiEngine::addToast("Loading state...", SolarSim::GuiEngine::ToastType::Info);
+                    }
+                    else if (event.key.code == sf::Keyboard::H) {
+                        state.showHelp = !state.showHelp;
+                    }
+                }
+            }
+
             // Only pass to graphics if ImGui doesn't want the event
             if (!ImGui::GetIO().WantCaptureMouse && !ImGui::GetIO().WantCaptureKeyboard) {
                 graphics.handleEvent(event);
@@ -134,12 +163,17 @@ int main() {
             guiState.elapsedYears = 0.0f;
             guiState.selectedBody = -1;
             history.clear();
+            SolarSim::GuiEngine::addToast("Loaded: " + SolarSim::StateManager::getPresetName(preset), SolarSim::GuiEngine::ToastType::Success);
             std::cout << "Loaded preset: " << SolarSim::StateManager::getPresetName(preset) << std::endl;
         }
         
         // Handle save state request (NEW)
         if (guiState.requestSave) {
-            SolarSim::StateManager::saveState(system, guiState.saveFilename);
+            if (SolarSim::StateManager::saveState(system, guiState.saveFilename)) {
+                SolarSim::GuiEngine::addToast("State saved successfully", SolarSim::GuiEngine::ToastType::Success);
+            } else {
+                SolarSim::GuiEngine::addToast("Failed to save state", SolarSim::GuiEngine::ToastType::Error);
+            }
             guiState.requestSave = false;
         }
         
@@ -153,6 +187,9 @@ int main() {
                 guiState.elapsedYears = 0.0f;
                 guiState.selectedBody = -1;
                 history.clear();
+                SolarSim::GuiEngine::addToast("State loaded successfully", SolarSim::GuiEngine::ToastType::Success);
+            } else {
+                SolarSim::GuiEngine::addToast("Failed to load state", SolarSim::GuiEngine::ToastType::Error);
             }
             guiState.requestLoad = false;
         }

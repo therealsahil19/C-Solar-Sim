@@ -13,11 +13,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Body.hpp"
-#include "Constants.hpp"
-#include "Camera3D.hpp"
-#include "ShaderProgram.hpp"
-#include "SphereRenderer.hpp"
+#include "Theme.hpp"
 
 namespace SolarSim {
 
@@ -79,21 +75,8 @@ public:
     GraphicsEngine(sf::RenderWindow& win, const std::string& basePath = "") 
         : window(win), shaderPath(basePath.empty() ? "shaders/" : basePath + "/shaders/")
     {
-        bodyColors["Sun"] = sf::Color::Yellow;
-        bodyColors["Earth"] = sf::Color(100, 149, 237);
-        bodyColors["Mars"] = sf::Color(193, 68, 14);
-        bodyColors["Jupiter"] = sf::Color(216, 202, 157);
-        bodyColors["Saturn"] = sf::Color(225, 216, 168);
-        bodyColors["Mercury"] = sf::Color(169, 169, 169);
-        bodyColors["Venus"] = sf::Color(255, 198, 73);
-        bodyColors["Uranus"] = sf::Color(209, 231, 231);
-        bodyColors["Neptune"] = sf::Color(63, 84, 186);
-        bodyColors["Moon"] = sf::Color(169, 169, 169);
-        bodyColors["Pluto"] = sf::Color(205, 186, 172);
-        bodyColors["Ceres"] = sf::Color(155, 155, 155);
-        bodyColors["Eris"] = sf::Color(235, 235, 235);
-        bodyColors["Makemake"] = sf::Color(200, 150, 120);
-        bodyColors["Haumea"] = sf::Color(180, 180, 200);
+        // Use unified theme colors
+        bodyColors = Theme::getBodyColors();
     }
 
     bool init() {
@@ -174,8 +157,8 @@ public:
             if (!init()) return;
         }
         
-        // Clear buffers
-        glClearColor(0.02f, 0.02f, 0.06f, 1.0f);
+        // Clear buffers using theme background
+        glClearColor(Theme::Background.x, Theme::Background.y, Theme::Background.z, Theme::Background.w);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // Get matrices
