@@ -51,6 +51,18 @@ target_link_libraries(SolarSim
     OpenGL::GL
 )
 
+# Custom command to copy DLLs to the build directory after build
+add_custom_command(TARGET SolarSim POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:sfml-graphics>
+        $<TARGET_FILE:sfml-window>
+        $<TARGET_FILE:sfml-system>
+        $<TARGET_FILE:ImGui-SFML::ImGui-SFML>
+        $<TARGET_FILE_DIR:SolarSim>
+    COMMENT "Copying runtime DLLs to executable directory..."
+)
+
+
 # Copy shaders to build directory
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
 
