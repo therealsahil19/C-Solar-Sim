@@ -40,10 +40,12 @@ class OctreePool {
 private:
     std::vector<OctreeNode> pool;
     int nextFree;
+    mutable std::vector<int> traversalStack;  // Pre-allocated for performance
 
 public:
     OctreePool(size_t initialCapacity = 1024) : nextFree(0) {
         pool.resize(initialCapacity);
+        traversalStack.reserve(256);  // Pre-allocate reasonable stack depth
     }
 
     void clear() { nextFree = 0; }
@@ -103,14 +105,13 @@ public:
         insert(pool[nodeIdx].children[idx], body);
     }
 
-    void calculateForceIterative(int rootIdx, Body* body, double theta, Vector3& totalForce) {
-        static std::vector<int> stack;
-        stack.clear();
-        stack.push_back(rootIdx);
+    void calculateForceIterative(int rootIdx, Body* body, double theta, Vector3& totalForce) const {
+        traversalStack.clear();
+        traversalStack.push_back(rootIdx);
 
-        while (!stack.empty()) {
-            int nodeIdx = stack.back();
-            stack.pop_back();
+        while (!traversalStack.empty()) {
+            int nodeIdx = traversalStack.back();
+            traversalStack.pop_back();
             const OctreeNode& node = pool[nodeIdx];
 
             if (node.isLeaf) {
@@ -129,7 +130,7 @@ public:
                     totalForce += r * (Constants::G * body->mass * node.totalMass * invD3);
                 } else {
                     for (int i = 0; i < 8; ++i) {
-                        if (node.children[i] != -1) stack.push_back(node.children[i]);
+                        if (node.children[i] != -1) traversalStack.push_back(node.children[i]);
                     }
                 }
             }

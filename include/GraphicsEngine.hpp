@@ -13,6 +13,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "Body.hpp"
+#include "Camera3D.hpp"
+#include "ShaderProgram.hpp"
+#include "SphereRenderer.hpp"
 #include "Theme.hpp"
 
 namespace SolarSim {

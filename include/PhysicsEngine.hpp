@@ -32,25 +32,61 @@ public:
     }
 
     /**
-     * @brief Calculates accelerations for all bodies using SIMD if possible.
+     * @brief Calculates accelerations for all bodies with optimized cache access.
+     * 
+     * Optimization notes:
+     * - Extracts position components to local variables to reduce struct access
+     * - Accumulates accelerations locally before writing back
+     * - Computes invDist once and derives invDist3 from it (faster than 1/sqrt^3)
      */
     static void calculateAccelerations(std::vector<Body>& bodies) {
         for (auto& body : bodies) body.resetAcceleration();
         
-        size_t n = bodies.size();
+        const size_t n = bodies.size();
         for (size_t i = 0; i < n; ++i) {
             Body& bi = bodies[i];
+            // Cache position components locally for better cache performance
+            const double xi = bi.position.x;
+            const double yi = bi.position.y;
+            const double zi = bi.position.z;
+            const double mi = bi.mass;
+            
+            // Local accumulator for acceleration
+            double axi = 0.0, ayi = 0.0, azi = 0.0;
+            
             for (size_t j = i + 1; j < n; ++j) {
                 Body& bj = bodies[j];
-                Vector3 r = bj.position - bi.position;
-                double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
-                double invDist3 = 1.0 / (distSq * std::sqrt(distSq));
-                double f_over_r = Constants::G * invDist3;
+                const double mj = bj.mass;
                 
-                Vector3 force_scaled = r * f_over_r;
-                bi.acceleration += force_scaled * bj.mass;
-                bj.acceleration -= force_scaled * bi.mass;
+                // Compute delta components
+                const double dx = bj.position.x - xi;
+                const double dy = bj.position.y - yi;
+                const double dz = bj.position.z - zi;
+                
+                // Distance calculation with softening
+                const double distSq = dx*dx + dy*dy + dz*dz + Constants::SOFTENING_EPSILON;
+                const double invDist = 1.0 / std::sqrt(distSq);
+                const double invDist3 = invDist * invDist * invDist;
+                const double f = Constants::G * invDist3;
+                
+                // Accumulate forces (scaled by respective masses)
+                const double fx = dx * f;
+                const double fy = dy * f;
+                const double fz = dz * f;
+                
+                axi += fx * mj;
+                ayi += fy * mj;
+                azi += fz * mj;
+                
+                bj.acceleration.x -= fx * mi;
+                bj.acceleration.y -= fy * mi;
+                bj.acceleration.z -= fz * mi;
             }
+            
+            // Write back accumulated acceleration
+            bi.acceleration.x += axi;
+            bi.acceleration.y += ayi;
+            bi.acceleration.z += azi;
         }
     }
 

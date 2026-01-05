@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <unordered_map>
 
 #include "glad.h"
 
@@ -14,11 +15,26 @@ namespace SolarSim {
 
 /**
  * @brief Utility class for loading, compiling, and using GLSL shaders.
+ * 
+ * Performance: Uniform locations are cached to avoid redundant
+ * glGetUniformLocation calls (expensive GPU driver synchronization).
  */
 class ShaderProgram {
 private:
     unsigned int programID = 0;
     bool valid = false;
+    mutable std::unordered_map<std::string, GLint> uniformCache;
+
+    /**
+     * @brief Get cached uniform location or fetch and cache if not present.
+     */
+    GLint getCachedLocation(const std::string& name) const {
+        auto it = uniformCache.find(name);
+        if (it != uniformCache.end()) return it->second;
+        GLint loc = glGetUniformLocation(programID, name.c_str());
+        uniformCache[name] = loc;
+        return loc;
+    }
 
     std::string readFile(const std::string& path) {
         std::ifstream file(path);
@@ -94,29 +110,29 @@ public:
     unsigned int getID() const { return programID; }
     bool isValid() const { return valid; }
 
-    // Uniform setters
+    // Uniform setters - use cached locations for performance
     void setBool(const std::string& name, bool value) const {
-        glUniform1i(glGetUniformLocation(programID, name.c_str()), (int)value);
+        glUniform1i(getCachedLocation(name), (int)value);
     }
 
     void setInt(const std::string& name, int value) const {
-        glUniform1i(glGetUniformLocation(programID, name.c_str()), value);
+        glUniform1i(getCachedLocation(name), value);
     }
 
     void setFloat(const std::string& name, float value) const {
-        glUniform1f(glGetUniformLocation(programID, name.c_str()), value);
+        glUniform1f(getCachedLocation(name), value);
     }
 
     void setVec3(const std::string& name, const glm::vec3& value) const {
-        glUniform3fv(glGetUniformLocation(programID, name.c_str()), 1, glm::value_ptr(value));
+        glUniform3fv(getCachedLocation(name), 1, glm::value_ptr(value));
     }
 
     void setMat3(const std::string& name, const glm::mat3& mat) const {
-        glUniformMatrix3fv(glGetUniformLocation(programID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+        glUniformMatrix3fv(getCachedLocation(name), 1, GL_FALSE, glm::value_ptr(mat));
     }
 
     void setMat4(const std::string& name, const glm::mat4& mat) const {
-        glUniformMatrix4fv(glGetUniformLocation(programID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+        glUniformMatrix4fv(getCachedLocation(name), 1, GL_FALSE, glm::value_ptr(mat));
     }
 
     ~ShaderProgram() {
