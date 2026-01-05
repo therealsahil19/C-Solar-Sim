@@ -9,6 +9,7 @@
 #include "Body.hpp"
 #include "PhysicsEngine.hpp"
 #include "StateManager.hpp"
+#include "HistoryManager.hpp"
 #include "Theme.hpp"
 
 namespace SolarSim {

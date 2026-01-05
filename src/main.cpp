@@ -163,7 +163,7 @@ int main() {
             guiState.elapsedYears = 0.0f;
             guiState.selectedBody = -1;
             history.clear();
-            SolarSim::GuiEngine::addToast("Loaded: " + SolarSim::StateManager::getPresetName(preset), SolarSim::GuiEngine::ToastType::Success);
+            SolarSim::GuiEngine::addToast(std::string("Loaded: ") + SolarSim::StateManager::getPresetName(preset), SolarSim::GuiEngine::ToastType::Success);
             std::cout << "Loaded preset: " << SolarSim::StateManager::getPresetName(preset) << std::endl;
         }
         
