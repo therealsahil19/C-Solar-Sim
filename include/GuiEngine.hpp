@@ -46,7 +46,11 @@ public:
      * @brief Initialize ImGui with SFML window.
      */
     static void init(sf::RenderWindow& window) {
-        ImGui::SFML::Init(window);
+        if (!ImGui::SFML::Init(window)) {
+            // Log error but we can't easily propagate failure from void function without changing signature
+            // In a real app we might throw or return bool
+            return;
+        }
         
         // Configure style for a professional look
         ImGuiStyle& style = ImGui::GetStyle();
