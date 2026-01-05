@@ -38,9 +38,11 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 
 ### Prerequisites
 - CMake 3.14+
-- C++17 compatible compiler (MSVC, GCC, Clang)
+- C++17 compatible compiler:
+  - **Windows**: MSVC 2019+ or MinGW-w64
+  - **Linux**: GCC 9+ or Clang 10+
 - OpenGL 4.5+ capable graphics card (using Compatibility Profile)
-- Linux dependencies (Debian/Ubuntu): `libgl1-mesa-dev`, `libxrandr-dev`, `libxcursor-dev`, `libxi-dev`, `libudev-dev`, `libopenal-dev`, `libvorbis-dev`, `libflac-dev`, `xvfb` (for headless)
+- **Linux dependencies** (Debian/Ubuntu): `libgl1-mesa-dev`, `libxrandr-dev`, `libxcursor-dev`, `libxi-dev`, `libudev-dev`, `libopenal-dev`, `libvorbis-dev`, `libflac-dev`, `xvfb` (for headless)
 
 ### Build Instructions
 
@@ -49,18 +51,25 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 git clone https://github.com/yourusername/Solar-Sim.git
 cd Solar-Sim
 
-# Create build directory
+# Standard Build
 mkdir build && cd build
-
-# Configure and build
 cmake ..
 cmake --build .
 
 # Run
-./SolarSim  # or SolarSim.exe on Windows
+./SolarSim  # Linux/macOS
+./Debug/SolarSim.exe # Windows (MSVC)
 ```
 
-Dependencies (SFML 2.6.1, ImGui 1.89.9, ImGui-SFML v2.6, GLM 0.9.9.8) are automatically fetched via CMake FetchContent.
+### Windows-Specific Notes
+If using Visual Studio/MSVC:
+1. Open PowerShell in the project root.
+2. Run `cmake -B build -G "Visual Studio 17 2022" -A x64`
+3. Run `cmake --build build --config Release`
+4. The executable will be in `build/Release/SolarSim.exe`.
+
+> [!TIP]
+> All dependencies (SFML, ImGui, GLM) are automatically fetched. Ensure you have an active internet connection on the first build.
 
 ## Controls
 
@@ -141,9 +150,25 @@ In these units, the gravitational constant G = 4π² ≈ 39.478.
 4. **Earth-Moon System**: Focused Earth-Moon dynamics
 5. **Binary Star Test**: Two equal-mass stars in orbit
 
+## Troubleshooting
+
+### "Failed to open shader file"
+Ensure the `shaders/` directory is co-located with the executable or that you are running from the project root.
+
+### "DLL Not Found"
+On Windows, CMake is configured to automatically copy required DLLs to the build folder. If they are missing, try re-running the build or manually copying them from the `_deps` folder within `build`.
+
+### Simulation Crashes/Freezes
+- Ensure your GPU drivers support OpenGL 4.5.
+- Check `build_log.txt` for specific initialization errors.
+
+## Contributing
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+
 ## License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 

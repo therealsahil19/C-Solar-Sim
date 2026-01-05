@@ -97,6 +97,22 @@ public:
         return std::clamp(0.01 * std::sqrt(minDistSq), baseDt / 100.0, baseDt);
     }
 
+    /**
+     * @brief Integrates system state using the Velocity Verlet algorithm.
+     * 
+     * Verlet is a symplectic integrator, meaning it preserves phase-space volume
+     * and exhibits excellent long-term energy conservation compared to non-symplectic
+     * methods like RK4.
+     * 
+     * Algorithm:
+     * 1. v_half = v_init + 0.5 * a_init * dt
+     * 2. p_new = p_init + v_half * dt
+     * 3. a_new = calculateAccelerations(p_new)
+     * 4. v_new = v_half + 0.5 * a_new * dt
+     * 
+     * @param bodies Collection of celestial bodies
+     * @param dt Timestep in years
+     */
     static void stepVerlet(std::vector<Body>& bodies, double dt) {
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
         for (auto& b : bodies) b.updatePosition(dt);
@@ -105,6 +121,21 @@ public:
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
     }
 
+    /**
+     * @brief Integrates system state using 4th-order Runge-Kutta (RK4).
+     * 
+     * RK4 provides a balance between computational cost and high-order accuracy.
+     * It samples the derivatives at four points within the timestep:
+     * 1. k1: Initial state
+     * 2. k2: Midpoint using k1
+     * 3. k3: Midpoint using k2
+     * 4. k4: End of interval using k3
+     * 
+     * The final state is a weighted average of these samples: (k1 + 2*k2 + 2*k3 + k4) / 6.
+     * 
+     * @param bodies Collection of celestial bodies
+     * @param dt Timestep in years
+     */
     static void stepRK4(std::vector<Body>& bodies, double dt) {
         size_t n = bodies.size();
         static std::vector<Vector3> kp, kv, p, v, a, tmp_p;
@@ -151,6 +182,17 @@ public:
         calculateAccelerations(bodies);
     }
 
+    /**
+     * @brief Optimizes force calculation using the Barnes-Hut algorithm (O(N log N)).
+     * 
+     * For large N simulations, direct O(N^2) gravity is too slow. Barnes-Hut
+     * partitions space into an Octree. For distant clusters of bodies, we calculate
+     * the force from the cluster's center of mass rather than individual bodies.
+     * 
+     * @param bodies Collection of celestial bodies
+     * @param dt Timestep in years
+     * @param theta Accuracy parameter; lower is more accurate (typically 0.5)
+     */
     static void stepBarnesHut(std::vector<Body>& bodies, double dt, double theta = 0.5) {
         static OctreePool pool;
         pool.clear();
@@ -177,12 +219,21 @@ public:
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
     }
 
+    /**
+     * @brief Calculates the total mechanical energy (Kinetic + Potential) of the system.
+     * 
+     * Used for verifying simulation stability and energy conservation.
+     * Potential energy includes a softening factor to prevent singularities.
+     * 
+     * @param bodies Collection of celestial bodies
+     * @returns Total energy in solar-scale units
+     */
     static double calculateTotalEnergy(const std::vector<Body>& bodies) {
         double k = 0, p = 0;
         for (size_t i = 0; i < bodies.size(); ++i) {
             k += 0.5 * bodies[i].mass * bodies[i].velocity.lengthSquared();
             for (size_t j = i + 1; j < bodies.size(); ++j)
-                p -= (Constants::G * bodies[i].mass * bodies[j].mass) / ((bodies[j].position - bodies[i].position).length() + 1e-4);
+                p -= (Constants::G * bodies[i].mass * bodies[j].mass) / ((bodies[j].position - bodies[i].position).length() + Constants::SOFTENING_EPSILON);
         }
         return k + p;
     }
