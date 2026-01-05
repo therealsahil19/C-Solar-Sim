@@ -1,50 +1,80 @@
 #ifndef GLAD_H
 #define GLAD_H
 
-// GLAD - OpenGL Loader Generator
-// Generated for OpenGL 3.3 Core Profile
-// This is a minimal GLAD implementation for Windows
+#include <SFML/OpenGL.hpp>
+#include <cstddef>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
+// Types - We assume SFML/OpenGL.hpp (via glext.h) provides these.
+// If not, we might need to conditionally define them, but for now let's rely on system headers.
+// However, standard glext.h defines PFNGL...PROC.
 
-#include <GL/gl.h>
+// Externs for pointers
+extern PFNGLGENVERTEXARRAYSPROC glad_glGenVertexArrays;
+extern PFNGLBINDVERTEXARRAYPROC glad_glBindVertexArray;
+extern PFNGLDELETEVERTEXARRAYSPROC glad_glDeleteVertexArrays;
+extern PFNGLGENBUFFERSPROC glad_glGenBuffers;
+extern PFNGLBINDBUFFERPROC glad_glBindBuffer;
+extern PFNGLBUFFERDATAPROC glad_glBufferData;
+extern PFNGLDELETEBUFFERSPROC glad_glDeleteBuffers;
+extern PFNGLVERTEXATTRIBPOINTERPROC glad_glVertexAttribPointer;
+extern PFNGLENABLEVERTEXATTRIBARRAYPROC glad_glEnableVertexAttribArray;
+extern PFNGLDISABLEVERTEXATTRIBARRAYPROC glad_glDisableVertexAttribArray;
+extern PFNGLCREATESHADERPROC glad_glCreateShader;
+extern PFNGLSHADERSOURCEPROC glad_glShaderSource;
+extern PFNGLCOMPILESHADERPROC glad_glCompileShader;
+extern PFNGLGETSHADERIVPROC glad_glGetShaderiv;
+extern PFNGLGETSHADERINFOLOGPROC glad_glGetShaderInfoLog;
+extern PFNGLDELETESHADERPROC glad_glDeleteShader;
+extern PFNGLCREATEPROGRAMPROC glad_glCreateProgram;
+extern PFNGLATTACHSHADERPROC glad_glAttachShader;
+extern PFNGLLINKPROGRAMPROC glad_glLinkProgram;
+extern PFNGLGETPROGRAMIVPROC glad_glGetProgramiv;
+extern PFNGLGETPROGRAMINFOLOGPROC glad_glGetProgramInfoLog;
+extern PFNGLDELETEPROGRAMPROC glad_glDeleteProgram;
+extern PFNGLUSEPROGRAMPROC glad_glUseProgram;
+extern PFNGLGETUNIFORMLOCATIONPROC glad_glGetUniformLocation;
+extern PFNGLUNIFORM1IPROC glad_glUniform1i;
+extern PFNGLUNIFORM1FPROC glad_glUniform1f;
+extern PFNGLUNIFORM3FVPROC glad_glUniform3fv;
+extern PFNGLUNIFORMMATRIX3FVPROC glad_glUniformMatrix3fv;
+extern PFNGLUNIFORMMATRIX4FVPROC glad_glUniformMatrix4fv;
+extern PFNGLACTIVETEXTUREPROC glad_glActiveTexture;
+extern PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap;
 
-// OpenGL 3.0+ function pointer types
-typedef void (APIENTRY *PFNGLGENVERTEXARRAYSPROC)(GLsizei n, GLuint *arrays);
-typedef void (APIENTRY *PFNGLBINDVERTEXARRAYPROC)(GLuint array);
-typedef void (APIENTRY *PFNGLDELETEVERTEXARRAYSPROC)(GLsizei n, const GLuint *arrays);
-typedef void (APIENTRY *PFNGLGENBUFFERSPROC)(GLsizei n, GLuint *buffers);
-typedef void (APIENTRY *PFNGLBINDBUFFERPROC)(GLenum target, GLuint buffer);
-typedef void (APIENTRY *PFNGLBUFFERDATAPROC)(GLenum target, ptrdiff_t size, const void *data, GLenum usage);
-typedef void (APIENTRY *PFNGLDELETEBUFFERSPROC)(GLsizei n, const GLuint *buffers);
-typedef void (APIENTRY *PFNGLVERTEXATTRIBPOINTERPROC)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
-typedef void (APIENTRY *PFNGLENABLEVERTEXATTRIBARRAYPROC)(GLuint index);
-typedef void (APIENTRY *PFNGLDISABLEVERTEXATTRIBARRAYPROC)(GLuint index);
-typedef GLuint (APIENTRY *PFNGLCREATESHADERPROC)(GLenum type);
-typedef void (APIENTRY *PFNGLSHADERSOURCEPROC)(GLuint shader, GLsizei count, const char *const*string, const GLint *length);
-typedef void (APIENTRY *PFNGLCOMPILESHADERPROC)(GLuint shader);
-typedef void (APIENTRY *PFNGLGETSHADERIVPROC)(GLuint shader, GLenum pname, GLint *params);
-typedef void (APIENTRY *PFNGLGETSHADERINFOLOGPROC)(GLuint shader, GLsizei bufSize, GLsizei *length, char *infoLog);
-typedef void (APIENTRY *PFNGLDELETESHADERPROC)(GLuint shader);
-typedef GLuint (APIENTRY *PFNGLCREATEPROGRAMPROC)(void);
-typedef void (APIENTRY *PFNGLATTACHSHADERPROC)(GLuint program, GLuint shader);
-typedef void (APIENTRY *PFNGLLINKPROGRAMPROC)(GLuint program);
-typedef void (APIENTRY *PFNGLGETPROGRAMIVPROC)(GLuint program, GLenum pname, GLint *params);
-typedef void (APIENTRY *PFNGLGETPROGRAMINFOLOGPROC)(GLuint program, GLsizei bufSize, GLsizei *length, char *infoLog);
-typedef void (APIENTRY *PFNGLDELETEPROGRAMPROC)(GLuint program);
-typedef void (APIENTRY *PFNGLUSEPROGRAMPROC)(GLuint program);
-typedef GLint (APIENTRY *PFNGLGETUNIFORMLOCATIONPROC)(GLuint program, const char *name);
-typedef void (APIENTRY *PFNGLUNIFORM1IPROC)(GLint location, GLint v0);
-typedef void (APIENTRY *PFNGLUNIFORM1FPROC)(GLint location, GLfloat v0);
-typedef void (APIENTRY *PFNGLUNIFORM3FVPROC)(GLint location, GLsizei count, const GLfloat *value);
-typedef void (APIENTRY *PFNGLUNIFORMMATRIX3FVPROC)(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
-typedef void (APIENTRY *PFNGLUNIFORMMATRIX4FVPROC)(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
-typedef void (APIENTRY *PFNGLACTIVETEXTUREPROC)(GLenum texture);
-typedef void (APIENTRY *PFNGLGENERATEMIPMAPPROC)(GLenum target);
+// Macros to redirect GL calls to our pointers
+#define glGenVertexArrays glad_glGenVertexArrays
+#define glBindVertexArray glad_glBindVertexArray
+#define glDeleteVertexArrays glad_glDeleteVertexArrays
+#define glGenBuffers glad_glGenBuffers
+#define glBindBuffer glad_glBindBuffer
+#define glBufferData glad_glBufferData
+#define glDeleteBuffers glad_glDeleteBuffers
+#define glVertexAttribPointer glad_glVertexAttribPointer
+#define glEnableVertexAttribArray glad_glEnableVertexAttribArray
+#define glDisableVertexAttribArray glad_glDisableVertexAttribArray
+#define glCreateShader glad_glCreateShader
+#define glShaderSource glad_glShaderSource
+#define glCompileShader glad_glCompileShader
+#define glGetShaderiv glad_glGetShaderiv
+#define glGetShaderInfoLog glad_glGetShaderInfoLog
+#define glDeleteShader glad_glDeleteShader
+#define glCreateProgram glad_glCreateProgram
+#define glAttachShader glad_glAttachShader
+#define glLinkProgram glad_glLinkProgram
+#define glGetProgramiv glad_glGetProgramiv
+#define glGetProgramInfoLog glad_glGetProgramInfoLog
+#define glDeleteProgram glad_glDeleteProgram
+#define glUseProgram glad_glUseProgram
+#define glGetUniformLocation glad_glGetUniformLocation
+#define glUniform1i glad_glUniform1i
+#define glUniform1f glad_glUniform1f
+#define glUniform3fv glad_glUniform3fv
+#define glUniformMatrix3fv glad_glUniformMatrix3fv
+#define glUniformMatrix4fv glad_glUniformMatrix4fv
+#define glActiveTexture glad_glActiveTexture
+#define glGenerateMipmap glad_glGenerateMipmap
 
-// OpenGL constants not in gl.h
+// Constants
 #ifndef GL_ARRAY_BUFFER
 #define GL_ARRAY_BUFFER 0x8892
 #endif
@@ -79,40 +109,7 @@ typedef void (APIENTRY *PFNGLGENERATEMIPMAPPROC)(GLenum target);
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
 
-// Global function pointers
-extern PFNGLGENVERTEXARRAYSPROC glGenVertexArrays;
-extern PFNGLBINDVERTEXARRAYPROC glBindVertexArray;
-extern PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArrays;
-extern PFNGLGENBUFFERSPROC glGenBuffers;
-extern PFNGLBINDBUFFERPROC glBindBuffer;
-extern PFNGLBUFFERDATAPROC glBufferData;
-extern PFNGLDELETEBUFFERSPROC glDeleteBuffers;
-extern PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer;
-extern PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray;
-extern PFNGLDISABLEVERTEXATTRIBARRAYPROC glDisableVertexAttribArray;
-extern PFNGLCREATESHADERPROC glCreateShader;
-extern PFNGLSHADERSOURCEPROC glShaderSource;
-extern PFNGLCOMPILESHADERPROC glCompileShader;
-extern PFNGLGETSHADERIVPROC glGetShaderiv;
-extern PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog;
-extern PFNGLDELETESHADERPROC glDeleteShader;
-extern PFNGLCREATEPROGRAMPROC glCreateProgram;
-extern PFNGLATTACHSHADERPROC glAttachShader;
-extern PFNGLLINKPROGRAMPROC glLinkProgram;
-extern PFNGLGETPROGRAMIVPROC glGetProgramiv;
-extern PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog;
-extern PFNGLDELETEPROGRAMPROC glDeleteProgram;
-extern PFNGLUSEPROGRAMPROC glUseProgram;
-extern PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
-extern PFNGLUNIFORM1IPROC glUniform1i;
-extern PFNGLUNIFORM1FPROC glUniform1f;
-extern PFNGLUNIFORM3FVPROC glUniform3fv;
-extern PFNGLUNIFORMMATRIX3FVPROC glUniformMatrix3fv;
-extern PFNGLUNIFORMMATRIX4FVPROC glUniformMatrix4fv;
-extern PFNGLACTIVETEXTUREPROC glActiveTexture;
-extern PFNGLGENERATEMIPMAPPROC glGenerateMipmap;
-
-// Initialize GLAD - call after OpenGL context is created
+// Initialize GLAD
 int gladLoadGL();
 
 #endif // GLAD_H

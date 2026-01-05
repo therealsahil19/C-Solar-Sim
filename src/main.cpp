@@ -43,7 +43,7 @@ int main() {
     settings.stencilBits = 8;
     settings.majorVersion = 3;
     settings.minorVersion = 3;
-    settings.attributeFlags = sf::ContextSettings::Core;
+    // settings.attributeFlags = sf::ContextSettings::Core;
     
     sf::RenderWindow window(sf::VideoMode(1280, 720), "Solar System Simulation 3D", 
                             sf::Style::Default, settings);
