@@ -63,11 +63,26 @@ add_custom_command(TARGET SolarSim POST_BUILD
 )
 
 
-# Copy shaders to build directory
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
+# Copy shaders to executable directory post-build
+add_custom_command(TARGET SolarSim POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/shaders
+        $<TARGET_FILE_DIR:SolarSim>/shaders
+    COMMENT "Copying shaders..."
+)
 
-# Copy textures to build directory  
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/textures DESTINATION ${CMAKE_BINARY_DIR})
+# Copy textures to executable directory post-build
+add_custom_command(TARGET SolarSim POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/textures
+        $<TARGET_FILE_DIR:SolarSim>/textures
+    COMMENT "Copying textures..."
+)
 
-# Copy data to build directory
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
+# Copy data to executable directory post-build
+add_custom_command(TARGET SolarSim POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:SolarSim>/data
+    COMMENT "Copying data..."
+)
