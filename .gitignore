@@ -1,0 +1,34 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.o
+*.a
+
+# Logs and temporary files
+*.log
+*.txt
+!README.txt
+build_log.txt
+build_output.txt
+
+# ImGui config (optional - comment out if you want to track)
+imgui.ini
+
+# OS generated files
+.DS_Store
+Thumbs.db
