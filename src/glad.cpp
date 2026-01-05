@@ -1,7 +1,12 @@
 #include "glad.h"
-#include <SFML/Window/Context.hpp>
 
-// Function pointers
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <GL/glx.h>
+#endif
+
+// Function pointers - initialized to nullptr
 PFNGLGENVERTEXARRAYSPROC glad_glGenVertexArrays = nullptr;
 PFNGLBINDVERTEXARRAYPROC glad_glBindVertexArray = nullptr;
 PFNGLDELETEVERTEXARRAYSPROC glad_glDeleteVertexArrays = nullptr;
@@ -35,8 +40,22 @@ PFNGLACTIVETEXTUREPROC glad_glActiveTexture = nullptr;
 PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap = nullptr;
 
 static void* loadProc(const char* name) {
-    // Use SFML to get the function address (cross-platform)
-    return (void*)sf::Context::getFunction(name);
+#ifdef _WIN32
+    // On Windows, use wglGetProcAddress for OpenGL extension functions
+    void* proc = (void*)wglGetProcAddress(name);
+    if (proc == nullptr || proc == (void*)0x1 || proc == (void*)0x2 || 
+        proc == (void*)0x3 || proc == (void*)-1) {
+        // Try loading from opengl32.dll directly for core functions
+        HMODULE module = LoadLibraryA("opengl32.dll");
+        if (module) {
+            proc = (void*)GetProcAddress(module, name);
+        }
+    }
+    return proc;
+#else
+    // On Linux/Unix, use glXGetProcAddress
+    return (void*)glXGetProcAddressARB((const GLubyte*)name);
+#endif
 }
 
 int gladLoadGL() {
@@ -72,5 +91,6 @@ int gladLoadGL() {
     glad_glActiveTexture = (PFNGLACTIVETEXTUREPROC)loadProc("glActiveTexture");
     glad_glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC)loadProc("glGenerateMipmap");
     
+    // Return success if critical functions loaded
     return glad_glGenVertexArrays != nullptr && glad_glCreateShader != nullptr;
 }

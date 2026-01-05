@@ -1,14 +1,99 @@
 #ifndef GLAD_H
 #define GLAD_H
 
-#include <SFML/OpenGL.hpp>
+// =============================================================================
+// Minimal OpenGL Loader for Windows
+// This header provides OpenGL 3.x extension function loading without requiring
+// external headers like glext.h
+// =============================================================================
+
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+    #include <GL/gl.h>
+#else
+    #include <GL/gl.h>
+#endif
+
 #include <cstddef>
+#include <cstdint>
 
-// Types - We assume SFML/OpenGL.hpp (via glext.h) provides these.
-// If not, we might need to conditionally define them, but for now let's rely on system headers.
-// However, standard glext.h defines PFNGL...PROC.
+// =============================================================================
+// OpenGL Type Definitions (needed for extension function pointers)
+// =============================================================================
 
-// Externs for pointers
+#ifndef APIENTRY
+    #define APIENTRY
+#endif
+
+#ifndef APIENTRYP
+    #define APIENTRYP APIENTRY *
+#endif
+
+#ifndef GLAPI
+    #define GLAPI extern
+#endif
+
+// GLsizeiptr and GLintptr for buffer operations
+typedef ptrdiff_t GLsizeiptr;
+typedef ptrdiff_t GLintptr;
+typedef char GLchar;
+
+// =============================================================================
+// OpenGL Function Pointer Type Definitions
+// =============================================================================
+
+// Vertex Array Objects
+typedef void (APIENTRYP PFNGLGENVERTEXARRAYSPROC)(GLsizei n, GLuint *arrays);
+typedef void (APIENTRYP PFNGLBINDVERTEXARRAYPROC)(GLuint array);
+typedef void (APIENTRYP PFNGLDELETEVERTEXARRAYSPROC)(GLsizei n, const GLuint *arrays);
+
+// Buffer Objects
+typedef void (APIENTRYP PFNGLGENBUFFERSPROC)(GLsizei n, GLuint *buffers);
+typedef void (APIENTRYP PFNGLBINDBUFFERPROC)(GLenum target, GLuint buffer);
+typedef void (APIENTRYP PFNGLBUFFERDATAPROC)(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+typedef void (APIENTRYP PFNGLDELETEBUFFERSPROC)(GLsizei n, const GLuint *buffers);
+
+// Vertex Attributes
+typedef void (APIENTRYP PFNGLVERTEXATTRIBPOINTERPROC)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+typedef void (APIENTRYP PFNGLENABLEVERTEXATTRIBARRAYPROC)(GLuint index);
+typedef void (APIENTRYP PFNGLDISABLEVERTEXATTRIBARRAYPROC)(GLuint index);
+
+// Shaders
+typedef GLuint (APIENTRYP PFNGLCREATESHADERPROC)(GLenum type);
+typedef void (APIENTRYP PFNGLSHADERSOURCEPROC)(GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length);
+typedef void (APIENTRYP PFNGLCOMPILESHADERPROC)(GLuint shader);
+typedef void (APIENTRYP PFNGLGETSHADERIVPROC)(GLuint shader, GLenum pname, GLint *params);
+typedef void (APIENTRYP PFNGLGETSHADERINFOLOGPROC)(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+typedef void (APIENTRYP PFNGLDELETESHADERPROC)(GLuint shader);
+
+// Programs
+typedef GLuint (APIENTRYP PFNGLCREATEPROGRAMPROC)(void);
+typedef void (APIENTRYP PFNGLATTACHSHADERPROC)(GLuint program, GLuint shader);
+typedef void (APIENTRYP PFNGLLINKPROGRAMPROC)(GLuint program);
+typedef void (APIENTRYP PFNGLGETPROGRAMIVPROC)(GLuint program, GLenum pname, GLint *params);
+typedef void (APIENTRYP PFNGLGETPROGRAMINFOLOGPROC)(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+typedef void (APIENTRYP PFNGLDELETEPROGRAMPROC)(GLuint program);
+typedef void (APIENTRYP PFNGLUSEPROGRAMPROC)(GLuint program);
+
+// Uniforms
+typedef GLint (APIENTRYP PFNGLGETUNIFORMLOCATIONPROC)(GLuint program, const GLchar *name);
+typedef void (APIENTRYP PFNGLUNIFORM1IPROC)(GLint location, GLint v0);
+typedef void (APIENTRYP PFNGLUNIFORM1FPROC)(GLint location, GLfloat v0);
+typedef void (APIENTRYP PFNGLUNIFORM3FVPROC)(GLint location, GLsizei count, const GLfloat *value);
+typedef void (APIENTRYP PFNGLUNIFORMMATRIX3FVPROC)(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+typedef void (APIENTRYP PFNGLUNIFORMMATRIX4FVPROC)(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+
+// Textures
+typedef void (APIENTRYP PFNGLACTIVETEXTUREPROC)(GLenum texture);
+typedef void (APIENTRYP PFNGLGENERATEMIPMAPPROC)(GLenum target);
+
+// =============================================================================
+// Function Pointer Externs
+// =============================================================================
+
 extern PFNGLGENVERTEXARRAYSPROC glad_glGenVertexArrays;
 extern PFNGLBINDVERTEXARRAYPROC glad_glBindVertexArray;
 extern PFNGLDELETEVERTEXARRAYSPROC glad_glDeleteVertexArrays;
@@ -41,7 +126,10 @@ extern PFNGLUNIFORMMATRIX4FVPROC glad_glUniformMatrix4fv;
 extern PFNGLACTIVETEXTUREPROC glad_glActiveTexture;
 extern PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap;
 
+// =============================================================================
 // Macros to redirect GL calls to our pointers
+// =============================================================================
+
 #define glGenVertexArrays glad_glGenVertexArrays
 #define glBindVertexArray glad_glBindVertexArray
 #define glDeleteVertexArrays glad_glDeleteVertexArrays
@@ -74,7 +162,10 @@ extern PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap;
 #define glActiveTexture glad_glActiveTexture
 #define glGenerateMipmap glad_glGenerateMipmap
 
-// Constants
+// =============================================================================
+// OpenGL Constants (commonly needed)
+// =============================================================================
+
 #ifndef GL_ARRAY_BUFFER
 #define GL_ARRAY_BUFFER 0x8892
 #endif
@@ -109,7 +200,11 @@ extern PFNGLGENERATEMIPMAPPROC glad_glGenerateMipmap;
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
 
-// Initialize GLAD
+// =============================================================================
+// Initialize GLAD - loads all function pointers
+// Must be called AFTER an OpenGL context is created
+// =============================================================================
+
 int gladLoadGL();
 
 #endif // GLAD_H
