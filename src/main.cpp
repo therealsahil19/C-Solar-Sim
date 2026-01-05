@@ -10,6 +10,7 @@
 #include "SystemData.hpp"
 #include "GuiEngine.hpp"
 #include "StateManager.hpp"
+#include "HistoryManager.hpp"
 
 int main() {
     std::cout << "Solar System Simulation: Professional Edition" << std::endl;
@@ -78,6 +79,9 @@ int main() {
     
     std::cout << "Controls: WASD (orbit camera), Scroll (zoom), or use GUI panels" << std::endl;
     
+    SolarSim::HistoryManager history;
+    bool wasTimeTravelActive = false;
+
     while (window.isOpen()) {
         // Event handling
         sf::Event event;
@@ -129,6 +133,7 @@ int main() {
             guiState.presetRequest = -1;  // Reset request
             guiState.elapsedYears = 0.0f;
             guiState.selectedBody = -1;
+            history.clear();
             std::cout << "Loaded preset: " << SolarSim::StateManager::getPresetName(preset) << std::endl;
         }
         
@@ -147,12 +152,28 @@ int main() {
                 SolarSim::PhysicsEngine::calculateAccelerations(system);
                 guiState.elapsedYears = 0.0f;
                 guiState.selectedBody = -1;
+                history.clear();
             }
             guiState.requestLoad = false;
         }
 
-        // Physics simulation (unless paused)
-        if (!guiState.paused) {
+        // Handle Time-Travel Transitions (NEW)
+        if (guiState.timeTravelActive && !wasTimeTravelActive) {
+            guiState.scrubTime = guiState.elapsedYears;
+        }
+        wasTimeTravelActive = guiState.timeTravelActive;
+
+        // Handle Epoch Marking (NEW)
+        if (guiState.requestMarkEpoch) {
+            history.markEpoch(guiState.epochName, guiState.elapsedYears, system);
+            guiState.requestMarkEpoch = false;
+            std::cout << "Marked Epoch: " << guiState.epochName << " at " << guiState.elapsedYears << " years" << std::endl;
+        }
+
+        // Time travel vs Physics
+        if (guiState.timeTravelActive) {
+            history.getStateAt(guiState.scrubTime, system);
+        } else if (!guiState.paused) {
             double frameTime = baseDt * guiState.timeRate;
             double currentT = 0;
             while (currentT < frameTime) {
@@ -169,11 +190,12 @@ int main() {
                 currentT += adt;
             }
             guiState.elapsedYears += (float)frameTime;
+            history.record(guiState.elapsedYears, system);
         }
 
         // Render
         graphics.render(system, guiState.showTrails, guiState.showAxes);
-        SolarSim::GuiEngine::render(system, scalePtr, rotXPtr, rotZPtr);
+        SolarSim::GuiEngine::render(system, history, scalePtr, rotXPtr, rotZPtr);
         SolarSim::GuiEngine::display(window);
         window.display();
     }

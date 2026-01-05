@@ -9,6 +9,7 @@
 #include "Body.hpp"
 #include "PhysicsEngine.hpp"
 #include "StateManager.hpp"
+#include "HistoryManager.hpp"
 
 namespace SolarSim {
 
@@ -35,6 +36,13 @@ public:
         bool requestSave = false;       // Request to save state
         bool requestLoad = false;       // Request to load state
         char saveFilename[256] = "simulation_state.csv";
+
+        // Time-Travel features
+        bool timeTravelActive = false;  // Whether we are currently scrubbing history
+        float scrubTime = 0.0f;         // The time we are scrubbing to
+        bool requestMarkEpoch = false;  // Request to mark current as epoch
+        char epochName[64] = "Meeting of Worlds";
+        std::string requestEpochJump = ""; // Name of epoch to jump to
     };
 
     static SimulationState& getState() {
@@ -83,7 +91,7 @@ public:
     /**
      * @brief Render all GUI panels.
      */
-    static void render(const std::vector<Body>& bodies, float* scalePtr, 
+    static void render(const std::vector<Body>& bodies, HistoryManager& history, float* scalePtr, 
                        float* rotXPtr, float* rotZPtr) {
         SimulationState& state = getState();
 
@@ -151,6 +159,26 @@ public:
             if (ImGui::Button("Load State")) state.requestLoad = true;
         }
 
+        // Time-Travel Panel
+        if (ImGui::CollapsingHeader("Time-Travel & Epochs", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Checkbox("Time-Travel Mode", &state.timeTravelActive);
+            
+            if (state.timeTravelActive) {
+                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.8f, 0.4f, 0.4f, 1.0f));
+                ImGui::SliderFloat("History Scrub", &state.scrubTime, 0.0f, state.elapsedYears, "Year %.2f");
+                ImGui::PopStyleColor();
+                ImGui::TextColored(ImVec4(1, 0.5, 0.5, 1), "SIMULATION PAUSED IN HISTORY");
+            } else {
+                ImGui::Text("Simulating: Active");
+            }
+
+            ImGui::Separator();
+            ImGui::InputText("Epoch Name", state.epochName, 64);
+            if (ImGui::Button("Mark Current Epoch")) {
+                state.requestMarkEpoch = true;
+            }
+        }
+
         ImGui::End();
 
         // Statistics Panel
@@ -179,6 +207,45 @@ public:
         
         // Body Information Panel (NEW)
         renderBodyInfoPanel(bodies, state);
+
+        // Epoch Comparison Panel
+        renderEpochPanel(state, history);
+    }
+    
+    /**
+     * @brief Renders the Epoch comparison/jump panel.
+     */
+    static void renderEpochPanel(SimulationState& state, HistoryManager& history) {
+        ImGui::SetNextWindowPos(ImVec2(1000, 370), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(270, 180), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Epochs", nullptr, ImGuiWindowFlags_NoCollapse);
+
+        ImGui::TextWrapped("Saved Epochs:");
+        ImGui::Separator();
+        
+        auto& epochs = history.getEpochs();
+        if (epochs.empty()) {
+            ImGui::TextDisabled("(No epochs saved)");
+        } else {
+            for (auto const& [name, snip] : epochs) {
+                if (ImGui::Button(name.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+                    state.scrubTime = (float)snip.time;
+                    state.timeTravelActive = true;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Jump to Year %.2f", snip.time);
+                }
+            }
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button("Clear History", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+            state.elapsedYears = 0;
+            state.timeTravelActive = false;
+            history.clear();
+        }
+
+        ImGui::End();
     }
     
     /**
