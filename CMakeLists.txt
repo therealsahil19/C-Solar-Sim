@@ -6,7 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_definitions(-D_USE_MATH_DEFINES)
 
 if(MSVC)
-    add_compile_options(/O2 /arch:AVX2 /fp:fast)
+    # Generic optimizations for Release builds, avoiding conflicts in Debug
+    add_compile_options("$<$<CONFIG:Release>:/O2;/arch:AVX2;/fp:fast>")
+    add_compile_options("$<$<CONFIG:RelWithDebInfo>:/O2;/arch:AVX2;/fp:fast>")
+    add_compile_options("$<$<CONFIG:MinSizeRel>:/Os;/arch:AVX2;/fp:fast>")
 else()
     add_compile_options(-O3 -mavx2 -ffast-math)
 endif()
@@ -47,6 +50,10 @@ add_executable(benchmark
     src/benchmark.cpp
 )
 
+add_executable(verify
+    tests/verify_features.cpp
+)
+
 # GLM is header-only - include directories
 target_include_directories(SolarSim PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
@@ -56,6 +63,11 @@ target_include_directories(benchmark PRIVATE
     include
 )
 
+target_include_directories(verify PRIVATE 
+    include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
+)
+
 # Link all libraries
 target_link_libraries(SolarSim
     sfml-graphics
@@ -63,6 +75,10 @@ target_link_libraries(SolarSim
     sfml-system
     ImGui-SFML::ImGui-SFML
     OpenGL::GL
+)
+
+target_link_libraries(verify
+    sfml-system
 )
 
 # Custom command to copy DLLs to the build directory after build

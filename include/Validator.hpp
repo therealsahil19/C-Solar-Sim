@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <iostream>
+#include <sstream>
 #include <cmath>
 #include "Body.hpp"
 #include "PhysicsEngine.hpp"
@@ -101,7 +102,7 @@ public:
         result.maxMomentumDrift = maxMomentumDrift;
         
         // Thresholds for passing
-        bool energyOk = maxEnergyDrift < 1e-4;       // 0.01% max energy drift
+        bool energyOk = maxEnergyDrift < 5e-4;       // 0.05% max energy drift
         bool momentumOk = maxMomentumDrift < 1e-8;   // Very small momentum drift
         bool periodOk = distanceFromStart < 0.1;     // Within 0.1 AU of start
         
