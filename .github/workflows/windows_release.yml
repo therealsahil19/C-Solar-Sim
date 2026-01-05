@@ -1,0 +1,40 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSFML_STATIC_LIBRARIES=ON
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Prepare Artifact
+      shell: bash
+      run: |
+        mkdir -p SolarSim-Windows
+        cp build/Release/SolarSim.exe SolarSim-Windows/
+        # Check if assets exist and copy them
+        if [ -d "data" ]; then cp -r data SolarSim-Windows/; fi
+        if [ -d "shaders" ]; then cp -r shaders SolarSim-Windows/; fi
+        if [ -d "textures" ]; then cp -r textures SolarSim-Windows/; fi
+        # If openal32.dll is needed (sometimes needed even with static SFML), try to find it
+        # Usually static SFML links OpenAL statically or requires the DLL.
+        # For simplicity, we assume the user has drivers or we might need to copy openal32.dll if it was generated in build/bin
+        if [ -f "build/Release/openal32.dll" ]; then cp build/Release/openal32.dll SolarSim-Windows/; fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SolarSim-Windows
+        path: SolarSim-Windows/
