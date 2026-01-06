@@ -140,26 +140,29 @@ Solar-Sim/
 ├── include/           # Header files
 │   ├── Body.hpp           # Celestial body class
 │   ├── Camera3D.hpp       # 3D camera system
-│   ├── ConfigLoader.hpp   # Configuration loading
-│   ├── ConsoleRenderer.hpp# Console output (legacy)
 │   ├── Constants.hpp      # Physical constants
-│   ├── DataExporter.hpp   # CSV export
 │   ├── EphemerisLoader.hpp# J2000 data loader
 │   ├── GraphicsEngine.hpp # OpenGL rendering
 │   ├── GuiEngine.hpp      # ImGui interface
+│   ├── HistoryManager.hpp # Time-travel snapshots
 │   ├── KeplerianSolver.hpp# Orbital elements solver
 │   ├── Octree.hpp         # Barnes-Hut algorithm
+│   ├── OrbitCalculator.hpp# Orbit visualization
 │   ├── PhysicsEngine.hpp  # Physics calculations
 │   ├── ShaderProgram.hpp  # Shader management
 │   ├── SphereRenderer.hpp # Sphere geometry
 │   ├── StateManager.hpp   # Save/load functionality
-│   ├── SystemData.hpp     # System initialization
+│   ├── SystemData.hpp     # Barycentric conversion
+│   ├── Theme.hpp          # Design tokens
 │   ├── Validator.hpp      # Physics validation
 │   ├── Vector3.hpp        # 3D vector math
-│   └── glad.h             # Custom OpenGL loader header
+│   └── glad.h             # OpenGL loader header
 ├── src/
 │   ├── main.cpp          # Application entry point
-│   └── glad.cpp          # Custom OpenGL loader implementation
+│   ├── benchmark.cpp     # Performance benchmarks
+│   └── glad.cpp          # OpenGL loader implementation
+├── tests/
+│   └── verify_features.cpp # E2E test suite
 ├── shaders/
 │   ├── planet.vert/frag  # Planet rendering shaders
 │   ├── sun.frag          # Sun emission shader
@@ -169,6 +172,7 @@ Solar-Sim/
 │   └── system.csv        # Body configuration data
 └── CMakeLists.txt        # Build configuration
 ```
+
 
 ## Physics Model
 
