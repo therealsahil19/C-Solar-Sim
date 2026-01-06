@@ -8,6 +8,7 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 
 ### Physics Engine
 - **Multiple Integrators**: Velocity Verlet, 4th-order Runge-Kutta (RK4), and Barnes-Hut (O(N log N))
+- **Performance Optimized**: SIMD-accelerated force calculations and pool-based Octree allocation
 - **Adaptive Timestepping**: Automatically adjusts timestep based on body proximity
 - **Collision Detection**: Inelastic merging with conservation of momentum
 - **Energy Conservation**: Symplectic integration maintains energy over long timescales
@@ -28,7 +29,11 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 ### Interactive GUI (Dear ImGui)
 - Time controls (pause, play, time rate adjustment)
 - Camera controls with live adjustment
-- Visibility toggles (trails, axes, asteroids)
+- **Accessibility Features**:
+    - High-contrast Dark/Light mode toggle
+    - Keyboard navigation (WCAG 2.1 AA compliant focus indicators)
+    - Non-blocking toast notifications for system events
+- Visibility toggles (trails, axes, asteroids, labels)
 - Integrator selection
 - Body information panel with orbital details
 - Preset scenarios (Inner Planets, Outer Giants, Earth-Moon, Binary Star)
@@ -73,13 +78,19 @@ If using Visual Studio/MSVC, we recommend using PowerShell:
 
 ## Controls
 
-### Keyboard
-| Key | Action |
-|-----|--------|
-| W/S | Pitch camera up/down |
-| A/D | Rotate camera left/right |
-| Scroll | Zoom in/out |
-| Space | Toggle pause (via GUI) |
+### Keyboard & Mouse
+
+| Input | Action |
+|-------|--------|
+| **W / S** | Pitch camera up/down |
+| **A / D** | Rotate camera left/right |
+| **Left Click + Drag**| Orbit rotation around selection |
+| **Right Click + Drag**| Pan view horizontally/vertically |
+| **Scroll Wheel** | Zoom in/out |
+| **Space** | Toggle pause simulation |
+| **T** | Toggle orbital trails |
+| **H** | Open Help & Shortcuts modal |
+| **Up / Down Arrows**| Navigate bodies in Info Panel |
 
 ### GUI Panels
 - **Simulation Controls**: Time rate, pause/play, presets, save/load

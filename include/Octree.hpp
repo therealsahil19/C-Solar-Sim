@@ -10,11 +10,18 @@
 
 namespace SolarSim {
 
+/**
+ * @brief A node in the spatial partitioning Octree.
+ * 
+ * Each node represents a cubic volume in 3D space. If a node is a leaf, it may contain
+ * a pointer to a Body. If it's an internal node, it contains a pre-calculated 
+ * center of mass and total mass of all its descendants.
+ */
 struct OctreeNode {
-    Vector3 centerOfMass;
-    double totalMass;
-    Vector3 minBounds;
-    double size;
+    Vector3 centerOfMass; ///< Weighted average position of all bodies in this node
+    double totalMass;     ///< Sum of masses of all bodies in this node
+    Vector3 minBounds;    ///< Minimum corner of the cubic volume
+    double size;          ///< Side length of the cubic volume
 
     int children[8]; // Indices in pool, -1 if none
     Body* bodies[1]; // Using fixed size for simplicity in pooled nodes
@@ -36,11 +43,22 @@ struct OctreeNode {
     }
 };
 
+/**
+ * @brief Memory-pooled Octree implementation for performance-critical N-body simulations.
+ * 
+ * To avoid the high cost of dynamic memory allocation and pointer chasing during 
+ * high-frequency tree builds, this class uses a contiguous pool of OctreeNode objects.
+ * 
+ * Physics:
+ * The implementation supports the Barnes-Hut algorithm, which approximates gravitational
+ * forces from distant clusters as a single force from their center of mass, 
+ * reducing complexity from O(N^2) to O(N log N).
+ */
 class OctreePool {
 private:
     std::vector<OctreeNode> pool;
     int nextFree;
-    mutable std::vector<int> traversalStack;  // Pre-allocated for performance
+    mutable std::vector<int> traversalStack;  ///< Reuse stack memory for iterative traversal
 
 public:
     OctreePool(size_t initialCapacity = 1024) : nextFree(0) {
@@ -48,8 +66,14 @@ public:
         traversalStack.reserve(256);  // Pre-allocate reasonable stack depth
     }
 
+    /**
+     * @brief Resets the pool without deallocating memory.
+     */
     void clear() { nextFree = 0; }
 
+    /**
+     * @brief Allocates a node from the pool.
+     */
     int allocate(Vector3 minB, double size) {
         if (nextFree >= (int)pool.size()) {
             pool.resize(pool.size() * 2);
@@ -105,6 +129,19 @@ public:
         insert(pool[nodeIdx].children[idx], body);
     }
 
+    /**
+     * @brief Calculates gravitational force on a body using an iterative tree traversal.
+     * 
+     * Uses the Barnes-Hut approximation:
+     * If the distance $d$ between the body and node's center of mass satisfies 
+     * $s/d < \theta$ (where $s$ is node size), the entire subtree is treated as a 
+     * single particle at the center of mass.
+     * 
+     * @param rootIdx Index of the tree root in the pool
+     * @param body The body to calculate forces for
+     * @param theta Accuracy threshold (Openness parameter)
+     * @param totalForce Output accumulator for the force vector
+     */
     void calculateForceIterative(int rootIdx, Body* body, double theta, Vector3& totalForce) const {
         traversalStack.clear();
         traversalStack.push_back(rootIdx);

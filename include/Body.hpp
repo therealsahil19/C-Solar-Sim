@@ -19,7 +19,7 @@ public:
 
     // Orbital trail for visualization
     std::deque<Vector3> trail;
-    static constexpr size_t MAX_TRAIL_POINTS = 1000;
+    static constexpr size_t MAX_TRAIL_POINTS = 500;
 
     // Visual & Physical Rotation
     double rotationAngle; // in degrees

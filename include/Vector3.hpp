@@ -73,6 +73,24 @@ struct ALIGN_AS(16) Vector3 {
         return Vector3();
     }
 
+    /**
+     * @brief Dot product with another vector.
+     */
+    double dot(const Vector3& other) const {
+        return x * other.x + y * other.y + z * other.z;
+    }
+
+    /**
+     * @brief Cross product with another vector.
+     */
+    Vector3 cross(const Vector3& other) const {
+        return Vector3(
+            y * other.z - z * other.y,
+            z * other.x - x * other.z,
+            x * other.y - y * other.x
+        );
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const Vector3& v) {
         os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
         return os;

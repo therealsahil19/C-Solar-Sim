@@ -3,18 +3,24 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <SFML/Window/Event.hpp>
+#include <SFML/Window/Mouse.hpp>
 #include <cmath>
 
 namespace SolarSim {
 
 enum class CameraMode {
-    Orbit,      // Rotate around a focus point
+    Orbit,      // Rotate around a focus point (mouse drag)
     FreeFly,    // WASD + mouse look
-    Follow      // Track a selected body
+    Follow      // Track a selected body (mouse drag to adjust view)
 };
 
 /**
- * @brief 3D camera with multiple viewing modes.
+ * @brief 3D camera with mouse-based controls.
+ * 
+ * Controls:
+ * - Left mouse drag: Orbit rotation (yaw/pitch)
+ * - Right mouse drag: Pan the focus point
+ * - Scroll wheel: Zoom in/out
  */
 class Camera3D {
 private:
@@ -37,8 +43,15 @@ private:
     float moveSpeed;
     float zoomSpeed;
     float rotateSpeed;
+    float panSpeed;
 
     CameraMode mode;
+
+    // Mouse state tracking
+    bool leftMouseDown = false;
+    bool rightMouseDown = false;
+    int lastMouseX = 0;
+    int lastMouseY = 0;
 
     void updateCameraVectors() {
         glm::vec3 newFront;
@@ -49,7 +62,7 @@ private:
         right = glm::normalize(glm::cross(front, worldUp));
         up = glm::normalize(glm::cross(right, front));
 
-        if (mode == CameraMode::Orbit) {
+        if (mode == CameraMode::Orbit || mode == CameraMode::Follow) {
             position = focusPoint - front * orbitDistance;
         }
     }
@@ -69,7 +82,8 @@ public:
         , farPlane(1000.0f)
         , moveSpeed(5.0f)
         , zoomSpeed(5.0f)
-        , rotateSpeed(0.3f)
+        , rotateSpeed(0.2f)
+        , panSpeed(0.05f)
         , mode(CameraMode::Orbit)
     {
         updateCameraVectors();
@@ -101,41 +115,73 @@ public:
     float* getFovPtr() { return &fov; }
 
     void handleEvent(const sf::Event& event) {
+        // Mouse wheel zoom (all modes)
         if (event.type == sf::Event::MouseWheelScrolled) {
             orbitDistance -= event.mouseWheelScroll.delta * zoomSpeed;
             orbitDistance = std::max(1.0f, std::min(orbitDistance, 500.0f));
             updateCameraVectors();
         }
 
-        if (event.type == sf::Event::KeyPressed) {
-            switch (mode) {
-                case CameraMode::Orbit:
-                    if (event.key.code == sf::Keyboard::W) pitch += 5.0f;
-                    if (event.key.code == sf::Keyboard::S) pitch -= 5.0f;
-                    if (event.key.code == sf::Keyboard::A) yaw -= 5.0f;
-                    if (event.key.code == sf::Keyboard::D) yaw += 5.0f;
-                    pitch = std::max(-89.0f, std::min(pitch, 89.0f));
-                    break;
-
-                case CameraMode::FreeFly:
-                    if (event.key.code == sf::Keyboard::W) position += front * moveSpeed;
-                    if (event.key.code == sf::Keyboard::S) position -= front * moveSpeed;
-                    if (event.key.code == sf::Keyboard::A) position -= right * moveSpeed;
-                    if (event.key.code == sf::Keyboard::D) position += right * moveSpeed;
-                    if (event.key.code == sf::Keyboard::Q) position -= up * moveSpeed;
-                    if (event.key.code == sf::Keyboard::E) position += up * moveSpeed;
-                    break;
-
-                case CameraMode::Follow:
-                    // In follow mode, WASD adjusts orbit around followed body
-                    if (event.key.code == sf::Keyboard::W) pitch += 5.0f;
-                    if (event.key.code == sf::Keyboard::S) pitch -= 5.0f;
-                    if (event.key.code == sf::Keyboard::A) yaw -= 5.0f;
-                    if (event.key.code == sf::Keyboard::D) yaw += 5.0f;
-                    pitch = std::max(-89.0f, std::min(pitch, 89.0f));
-                    break;
+        // Mouse button press
+        if (event.type == sf::Event::MouseButtonPressed) {
+            if (event.mouseButton.button == sf::Mouse::Left) {
+                leftMouseDown = true;
+                lastMouseX = event.mouseButton.x;
+                lastMouseY = event.mouseButton.y;
             }
-            updateCameraVectors();
+            if (event.mouseButton.button == sf::Mouse::Right) {
+                rightMouseDown = true;
+                lastMouseX = event.mouseButton.x;
+                lastMouseY = event.mouseButton.y;
+            }
+        }
+
+        // Mouse button release
+        if (event.type == sf::Event::MouseButtonReleased) {
+            if (event.mouseButton.button == sf::Mouse::Left) {
+                leftMouseDown = false;
+            }
+            if (event.mouseButton.button == sf::Mouse::Right) {
+                rightMouseDown = false;
+            }
+        }
+
+        // Mouse movement
+        if (event.type == sf::Event::MouseMoved) {
+            int deltaX = event.mouseMove.x - lastMouseX;
+            int deltaY = event.mouseMove.y - lastMouseY;
+            lastMouseX = event.mouseMove.x;
+            lastMouseY = event.mouseMove.y;
+
+            if (leftMouseDown) {
+                // Left drag: Orbit rotation (yaw/pitch)
+                if (mode == CameraMode::Orbit || mode == CameraMode::Follow) {
+                    yaw += static_cast<float>(deltaX) * rotateSpeed;
+                    pitch -= static_cast<float>(deltaY) * rotateSpeed;
+                    pitch = std::max(-89.0f, std::min(pitch, 89.0f));
+                    updateCameraVectors();
+                }
+            }
+
+            if (rightMouseDown) {
+                // Right drag: Pan the focus point
+                if (mode == CameraMode::Orbit || mode == CameraMode::Follow) {
+                    float panScale = orbitDistance * panSpeed * 0.01f;
+                    focusPoint -= right * static_cast<float>(deltaX) * panScale;
+                    focusPoint += up * static_cast<float>(deltaY) * panScale;
+                    updateCameraVectors();
+                }
+            }
+        }
+
+        // Keep WASD for FreeFly mode only
+        if (event.type == sf::Event::KeyPressed && mode == CameraMode::FreeFly) {
+            if (event.key.code == sf::Keyboard::W) position += front * moveSpeed;
+            if (event.key.code == sf::Keyboard::S) position -= front * moveSpeed;
+            if (event.key.code == sf::Keyboard::A) position -= right * moveSpeed;
+            if (event.key.code == sf::Keyboard::D) position += right * moveSpeed;
+            if (event.key.code == sf::Keyboard::Q) position -= up * moveSpeed;
+            if (event.key.code == sf::Keyboard::E) position += up * moveSpeed;
         }
     }
 
@@ -145,3 +191,4 @@ public:
 };
 
 } // namespace SolarSim
+

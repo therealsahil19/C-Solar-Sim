@@ -16,6 +16,11 @@ namespace SolarSim {
 
 /**
  * @brief Dear ImGui-based GUI for simulation controls and statistics.
+ * 
+ * Reorganized into three fixed-position panels:
+ * - Time Controls (bottom-left)
+ * - Visibility (top-right)
+ * - Body Information (middle-right)
  */
 class GuiEngine {
 public:
@@ -28,40 +33,50 @@ public:
         float elapsed = 0.0f;
     };
 
-    // Simulation state exposed to GUI
+    /**
+     * @brief Shared state between the GUI and the Main Loop / Physics Engine.
+     * 
+     * This structure acts as a "Message Bus" where the GUI writes requests (e.g., presetRequest)
+     * and reads simulation status (e.g., elapsedYears, fps).
+     */
     struct SimulationState {
-        bool paused = false;
-        float timeRate = 1.0f;
-        int integrator = 2;  // 0=Verlet, 1=RK4, 2=Barnes-Hut
-        bool showTrails = true;
-        bool showAxes = true;
-        bool showLabels = false;
-        bool showAsteroids = true;
-        float elapsedYears = 0.0f;
-        int fps = 0;
+        bool paused = false;        ///< Is the physics integration halted?
+        float timeRate = 1.0f;      ///< Multiplier for delta time (1.0 = Real-time approx)
+        int integrator = 2;         ///< Chosen integration method (0=Verlet, 1=RK4, 2=Barnes-Hut)
+        bool showTrails = true;     ///< Toggle for orbital path visualization
+        bool showLabels = false;    ///< Toggle for body name tags
+        bool showAsteroids = true;  ///< Toggle for orbital belt rendering
+        bool showOrbits = true;     ///< Toggle for geometric orbit prediction lines
+        float elapsedYears = 0.0f;  ///< Relative simulation time in years
+        int fps = 0;                ///< Monitored frames per second
         
-        // New Step 19 features
-        int selectedBody = -1;          // Index of selected body (-1 = none)
-        int presetRequest = -1;         // Request to load preset (-1 = none)
-        bool requestSave = false;       // Request to save state
-        bool requestLoad = false;       // Request to load state
-        char saveFilename[256] = "simulation_state.csv";
+        // Body selection
+        int selectedBody = 0;           ///< Index of the currently focused body
+        int presetRequest = -1;         ///< ID of preset to load (-1 if none)
+        bool requestSave = false;       ///< Signal to trigger state export
+        bool requestLoad = false;       ///< Signal to trigger state import
+        char saveFilename[256] = "simulation_state.csv"; ///< Target filename for save/load
 
-        // Time-Travel features
-        bool timeTravelActive = false;  // Whether we are currently scrubbing history
-        float scrubTime = 0.0f;         // The time we are scrubbing to
-        bool requestMarkEpoch = false;  // Request to mark current as epoch
+        // Time-Travel features (Legacy/Internal)
+        bool timeTravelActive = false;
+        float scrubTime = 0.0f;
+        bool requestMarkEpoch = false;
         char epochName[64] = "Meeting of Worlds";
-        std::string requestEpochJump = ""; // Name of epoch to jump to
+        std::string requestEpochJump = "";
 
-        // UX Additions
-        bool showHelp = false;
-        std::vector<Toast> toasts;
+        // UI & UX state
+        bool showHelp = false;          ///< Toggle for the help modal
+        std::vector<Toast> toasts;      ///< Active notification queue
         
-        // 🎨 Palette Unleashed: Theme & A11y
-        bool darkMode = true;           // Theme toggle
-        bool isLoading = false;         // Loading state indicator
-        float loadingProgress = 0.0f;   // Progress 0.0-1.0
+        // Theme & Visual Settings
+        bool darkMode = true;           ///< Dark/Light theme state
+        bool isLoading = false;         ///< Is a long-running process (like preset loading) active?
+        float loadingProgress = 0.0f;   ///< Progress percentage [0..1]
+        
+        // Panel Toggle States (WCAG A11y)
+        bool showTimeControls = true;
+        bool showVisibility = true;
+        bool showBodyInfo = true;
     };
 
     static SimulationState& getState() {
@@ -162,18 +177,68 @@ public:
     }
 
     /**
-     * @brief Render all GUI panels.
+     * @brief Render Time Controls panel (bottom-left, fixed position).
      */
-    static void render(const std::vector<Body>& bodies, HistoryManager& history, float* scalePtr, 
-                       float* rotXPtr, float* rotZPtr) {
-        SimulationState& state = getState();
-
-        // Control Panel
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(290, 450), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Simulation Controls", nullptr, ImGuiWindowFlags_NoCollapse);
+    static void renderTimeControlsPanel(SimulationState& state) {
+        if (!state.showTimeControls) return;
         
-        // 🎨 Theme Toggle (A11y: visible, accessible)
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 panelSize(300, 160);
+        ImVec2 panelPos(10, viewport->WorkSize.y - panelSize.y - 10);
+        
+        ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(panelSize, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(250, 140), ImVec2(400, 250));
+        
+        ImGui::Begin("Time Controls", &state.showTimeControls, 
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        
+        // Play/Pause and Reset buttons
+        if (ImGui::Button(state.paused ? "  Play  " : " Pause ", ImVec2(80, 30))) {
+            state.paused = !state.paused;
+            addToast(state.paused ? "Simulation Paused" : "Simulation Resumed", 
+                     state.paused ? ToastType::Warning : ToastType::Success);
+        }
+        ImGui::SetItemTooltip("Toggle simulation playback (Space)");
+
+        ImGui::SameLine();
+        if (ImGui::Button("Reset", ImVec2(80, 30))) {
+            state.elapsedYears = 0.0f;
+            addToast("Time reset to 0", ToastType::Info);
+        }
+        ImGui::SetItemTooltip("Reset elapsed time to zero");
+
+        ImGui::Spacing();
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderFloat("##TimeRate", &state.timeRate, 0.1f, 100.0f, "Time Rate: %.1fx");
+        ImGui::SetItemTooltip("Adjust the speed of time (1.0 = Realtime approx)");
+
+        ImGui::Spacing();
+        ImGui::Text("Elapsed: %.2f years", state.elapsedYears);
+        
+        ImGui::Spacing();
+        ImGui::Text("FPS: %d | Bodies: Active", state.fps);
+
+        ImGui::End();
+    }
+
+    /**
+     * @brief Render Visibility panel (top-right, fixed position).
+     */
+    static void renderVisibilityPanel(SimulationState& state) {
+        if (!state.showVisibility) return;
+        
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 panelSize(260, 200);
+        ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 10);
+        
+        ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
+        
+        ImGui::Begin("Visibility", &state.showVisibility,
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        
+        // Theme toggle in header
         ImGui::SameLine(ImGui::GetWindowWidth() - 45);
         if (ImGui::Button(state.darkMode ? "#" : "O", ImVec2(28, 0))) {
             state.darkMode = !state.darkMode;
@@ -181,146 +246,145 @@ public:
             addToast(state.darkMode ? "Dark Mode" : "Light Mode", ToastType::Info);
         }
         ImGui::SetItemTooltip("Toggle Dark/Light Theme");
-
-        // Time Controls
-        if (ImGui::CollapsingHeader("Time Controls", ImGuiTreeNodeFlags_DefaultOpen)) {
-            if (ImGui::Button(state.paused ? "  Play  " : " Pause ")) {
-                state.paused = !state.paused;
-                addToast(state.paused ? "Simulation Paused" : "Simulation Resumed", 
-                         state.paused ? ToastType::Warning : ToastType::Success);
-            }
-            ImGui::SetItemTooltip("Toggle simulation playback (Space)");
-
-            ImGui::SameLine();
-            if (ImGui::Button("Reset")) {
-                state.elapsedYears = 0.0f;
-                addToast("Time reset to 0", ToastType::Info);
-            }
-            ImGui::SetItemTooltip("Reset elapsed time to zero");
-
-            ImGui::SliderFloat("Time Rate", &state.timeRate, 0.1f, 100.0f, "%.1fx");
-            ImGui::SetItemTooltip("Adjust the speed of time (1.0 = Realtime approx)");
-
-            ImGui::Text("Elapsed: %.2f years", state.elapsedYears);
-        }
-
-        // Camera Controls
-        if (ImGui::CollapsingHeader("Camera Controls", ImGuiTreeNodeFlags_DefaultOpen)) {
-            if (scalePtr) ImGui::SliderFloat("Distance", scalePtr, 1.0f, 500.0f);
-            if (rotXPtr) ImGui::SliderFloat("Pitch", rotXPtr, -89.0f, 89.0f);
-            if (rotZPtr) ImGui::SliderFloat("Yaw", rotZPtr, -180.0f, 180.0f);
-            if (ImGui::Button("Reset Camera")) {
-                if (scalePtr) *scalePtr = 80.0f;
-                if (rotXPtr) *rotXPtr = 30.0f;
-                if (rotZPtr) *rotZPtr = -90.0f;
-                addToast("Camera reset", ToastType::Info);
-            }
-            ImGui::SetItemTooltip("Reset camera to default orientation");
-        }
-
-        // Visibility Toggles
-        if (ImGui::CollapsingHeader("Visibility", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::Checkbox("Orbital Trails (T)", &state.showTrails);
-            ImGui::Checkbox("Coordinate Axes", &state.showAxes);
-            ImGui::Checkbox("Body Labels", &state.showLabels);
-            ImGui::Checkbox("Asteroids", &state.showAsteroids);
-        }
-
-        // Integration Method
-        if (ImGui::CollapsingHeader("Integrator")) {
-            if (ImGui::RadioButton("Velocity Verlet", &state.integrator, 0)) addToast("Switched to Verlet", ToastType::Info);
-            if (ImGui::RadioButton("Runge-Kutta 4", &state.integrator, 1)) addToast("Switched to RK4", ToastType::Info);
-            if (ImGui::RadioButton("Barnes-Hut (O(N log N))", &state.integrator, 2)) addToast("Switched to Barnes-Hut", ToastType::Info);
-        }
         
-        // Preset Scenarios
-        if (ImGui::CollapsingHeader("Preset Scenarios")) {
-            // Loading indicator
-            if (state.isLoading) {
-                ImGui::TextColored(Theme::Info, "Loading...");
-                ImGui::ProgressBar(state.loadingProgress, ImVec2(-1, 4));
-            } else {
-                if (ImGui::Button("Full Solar System", ImVec2(130, 0))) state.presetRequest = 0;
-                ImGui::SameLine();
-                if (ImGui::Button("Inner Planets", ImVec2(130, 0))) state.presetRequest = 1;
-                if (ImGui::Button("Outer Giants", ImVec2(130, 0))) state.presetRequest = 2;
-                ImGui::SameLine();
-                if (ImGui::Button("Earth-Moon", ImVec2(130, 0))) state.presetRequest = 3;
-                if (ImGui::Button("Binary Star Test", ImVec2(130, 0))) state.presetRequest = 4;
+        ImGui::Spacing();
+        ImGui::Checkbox("Orbital Trails (T)", &state.showTrails);
+        ImGui::Checkbox("Orbit Ellipses", &state.showOrbits);
+        ImGui::Checkbox("Body Labels", &state.showLabels);
+        ImGui::Checkbox("Asteroids", &state.showAsteroids);
+
+        ImGui::End();
+    }
+
+    /**
+     * @brief Render Body Information panel (middle-right, fixed position).
+     */
+    static void renderBodyInfoPanel(const std::vector<Body>& bodies, SimulationState& state) {
+        if (!state.showBodyInfo) return;
+        
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 panelSize(260, 420);
+        // Position below visibility panel with gap
+        ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 220);
+        
+        ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
+        
+        ImGui::Begin("Body Information", &state.showBodyInfo,
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        
+        // A11y: Keyboard navigation hints
+        ImGui::TextDisabled("Use Up/Down arrows to navigate");
+        
+        if (ImGui::BeginCombo("##SelectBody", 
+            state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
+                ? bodies[state.selectedBody].name.c_str() : "(none)")) {
+            
+            for (int i = 0; i < (int)bodies.size(); ++i) {
+                if (bodies[i].name == "Asteroid") continue;
                 
-                if (state.presetRequest >= 0) {
-                    state.isLoading = true;
-                    state.loadingProgress = 0.0f;
-                    addToast("Loading preset...", ToastType::Info);
+                bool isSelected = (state.selectedBody == i);
+                if (ImGui::Selectable(bodies[i].name.c_str(), isSelected)) {
+                    state.selectedBody = i;
                 }
             }
+            ImGui::EndCombo();
         }
         
-        // Save/Load State
-        if (ImGui::CollapsingHeader("Save/Load")) {
-            ImGui::InputText("Filename", state.saveFilename, 256);
-            if (ImGui::Button("Save State (S)")) state.requestSave = true;
-            ImGui::SameLine();
-            if (ImGui::Button("Load State (L)")) state.requestLoad = true;
-        }
-
-        // Time-Travel Panel
-        if (ImGui::CollapsingHeader("Time-Travel & Epochs", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::Checkbox("Time-Travel Mode", &state.timeTravelActive);
+        // A11y: Keyboard body navigation
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive()) {
+            int maxBody = -1;
+            for (int i = 0; i < (int)bodies.size(); ++i) {
+                if (bodies[i].name != "Asteroid") maxBody = i;
+            }
             
-            if (state.timeTravelActive) {
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab, Theme::Error);
-                ImGui::SliderFloat("History Scrub", &state.scrubTime, 0.0f, state.elapsedYears, "Year %.2f");
-                ImGui::PopStyleColor();
-                ImGui::TextColored(Theme::Error, "SIMULATION PAUSED IN HISTORY");
-            } else {
-                ImGui::Text("Simulating: Active");
+            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+                do {
+                    state.selectedBody = std::min(state.selectedBody + 1, maxBody);
+                } while (state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
+                         && bodies[state.selectedBody].name == "Asteroid");
             }
-
+            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+                do {
+                    state.selectedBody = std::max(state.selectedBody - 1, 0);
+                } while (state.selectedBody >= 0 && bodies[state.selectedBody].name == "Asteroid");
+            }
+        }
+        
+        ImGui::Separator();
+        
+        if (state.selectedBody >= 0 && state.selectedBody < (int)bodies.size()) {
+            const Body& b = bodies[state.selectedBody];
+            
+            ImGui::TextColored(Theme::PrimaryHover, "Name: %s", b.name.c_str());
             ImGui::Separator();
-            ImGui::InputText("Epoch Name", state.epochName, 64);
-            if (ImGui::Button("Mark Current Epoch")) {
-                state.requestMarkEpoch = true;
-                addToast("Epoch marked: " + std::string(state.epochName), ToastType::Success);
+            
+            ImGui::Text("Mass: %.6e M", b.mass);
+            ImGui::Text("Radius: %.6e AU", b.radius);
+            
+            ImGui::Separator();
+            ImGui::Text("Position (AU):");
+            ImGui::Text("  X: %.4f", b.position.x);
+            ImGui::Text("  Y: %.4f", b.position.y);
+            ImGui::Text("  Z: %.4f", b.position.z);
+            
+            double dist = b.position.length();
+            ImGui::Text("Distance: %.4f AU", dist);
+            
+            ImGui::Separator();
+            ImGui::Text("Velocity (AU/y):");
+            ImGui::Text("  X: %.4f", b.velocity.x);
+            ImGui::Text("  Y: %.4f", b.velocity.y);
+            ImGui::Text("  Z: %.4f", b.velocity.z);
+            
+            double speed = b.velocity.length();
+            ImGui::Text("Speed: %.4f AU/y", speed);
+            
+            if (dist > 0.01) {
+                double T = std::sqrt(dist * dist * dist);
+                ImGui::Text("Orbital Period: %.2f y", T);
             }
+            
+            ImGui::Separator();
+            ImGui::Text("Rotation: %.1f deg", b.rotationAngle);
+            ImGui::Text("Tilt: %.1f deg", b.axialTilt);
+        } else {
+            ImGui::TextWrapped("Select a body from the dropdown to view its properties.");
         }
-
-        ImGui::Separator();
-        if (ImGui::Button("Help & Shortcuts (H)", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-            state.showHelp = !state.showHelp;
-        }
-
+        
         ImGui::End();
+    }
 
-        // Statistics Panel
-        ImGui::SetNextWindowPos(ImVec2(10, 440), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(280, 150), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Statistics", nullptr, ImGuiWindowFlags_NoCollapse);
+    /**
+     * @brief Render all GUI panels.
+     */
+    static void render(const std::vector<Body>& bodies, HistoryManager& history, float* scalePtr, 
+                       float* rotXPtr, float* rotZPtr) {
+        (void)history;  // No longer used (epoch panel removed)
+        (void)scalePtr; // Camera controls removed
+        (void)rotXPtr;
+        (void)rotZPtr;
+        
+        SimulationState& state = getState();
 
-        ImGui::Text("Bodies: %zu", bodies.size());
-        ImGui::Text("FPS: %d", state.fps);
-        double energy = PhysicsEngine::calculateTotalEnergy(bodies);
-        ImGui::Text("Total Energy: %.6f", energy);
-        
-        static double initialEnergy = energy;
-        static bool first = true;
-        if (first) { initialEnergy = energy; first = false; }
-        double drift = std::abs((energy - initialEnergy) / initialEnergy) * 100.0;
-        
-        ImGui::Text("Energy Drift:");
-        ImGui::SameLine();
-        ImVec4 driftColor = (drift < 0.001) ? Theme::Success : (drift < 0.01) ? Theme::Warning : Theme::Error;
-        ImGui::TextColored(driftColor, "%.6f%%", drift);
-        
-        ImGui::Separator();
-        ImGui::Text("Integrator: %s", 
-            state.integrator == 0 ? "Verlet" : 
-            state.integrator == 1 ? "RK4" : "Barnes-Hut");
-
-        ImGui::End();
-        
+        // Render the three fixed panels
+        renderTimeControlsPanel(state);
+        renderVisibilityPanel(state);
         renderBodyInfoPanel(bodies, state);
-        renderEpochPanel(state, history);
+        
+        // Panel re-open buttons (when panels are closed)
+        bool anyPanelClosed = !state.showTimeControls || !state.showVisibility || !state.showBodyInfo;
+        if (anyPanelClosed) {
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkSize.x / 2 - 100, 10), ImGuiCond_Always);
+            ImGui::Begin("##PanelToggles", nullptr, 
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+            if (!state.showTimeControls && ImGui::Button("Show Time Controls")) state.showTimeControls = true;
+            if (!state.showVisibility && ImGui::Button("Show Visibility")) state.showVisibility = true;
+            if (!state.showBodyInfo && ImGui::Button("Show Body Info")) state.showBodyInfo = true;
+            ImGui::End();
+        }
+        
         renderHelpPanel(state);
         renderToasts(state);
     }
@@ -377,18 +441,18 @@ public:
             ImGui::Separator();
             ImGui::Columns(2, "helpcolumns", false);
             ImGui::Text("Space"); ImGui::NextColumn(); ImGui::Text("Toggle Pause"); ImGui::NextColumn();
-            ImGui::Text("W / S"); ImGui::NextColumn(); ImGui::Text("Pitch Up / Down"); ImGui::NextColumn();
-            ImGui::Text("A / D"); ImGui::NextColumn(); ImGui::Text("Yaw Left / Right"); ImGui::NextColumn();
             ImGui::Text("T");     ImGui::NextColumn(); ImGui::Text("Toggle Trails"); ImGui::NextColumn();
-            ImGui::Text("S / L"); ImGui::NextColumn(); ImGui::Text("Save / Load State"); ImGui::NextColumn();
             ImGui::Text("H");     ImGui::NextColumn(); ImGui::Text("Toggle Help"); ImGui::NextColumn();
             ImGui::Columns(1);
             
             ImGui::Spacing();
             ImGui::TextColored(Theme::PrimaryHover, "Mouse Controls:");
             ImGui::Separator();
-            ImGui::BulletText("Scroll: Zoom In/Out");
-            ImGui::BulletText("Left Mouse: Interact with GUI");
+            ImGui::Columns(2, "mousecolumns", false);
+            ImGui::Text("Scroll"); ImGui::NextColumn(); ImGui::Text("Zoom In/Out"); ImGui::NextColumn();
+            ImGui::Text("Left Drag"); ImGui::NextColumn(); ImGui::Text("Orbit Camera"); ImGui::NextColumn();
+            ImGui::Text("Right Drag"); ImGui::NextColumn(); ImGui::Text("Pan View"); ImGui::NextColumn();
+            ImGui::Columns(1);
             
             ImGui::Spacing();
             if (ImGui::Button("Close", ImVec2(120, 0))) {
@@ -397,138 +461,6 @@ public:
             }
             ImGui::EndPopup();
         }
-    }
-
-    /**
-     * @brief Renders the Epoch comparison/jump panel.
-     */
-    static void renderEpochPanel(SimulationState& state, HistoryManager& history) {
-        ImGui::SetNextWindowPos(ImVec2(1000, 390), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(270, 180), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Epochs", nullptr, ImGuiWindowFlags_NoCollapse);
-
-        ImGui::TextWrapped("Saved Epochs:");
-        ImGui::Separator();
-        
-        auto& epochs = history.getEpochs();
-        if (epochs.empty()) {
-            ImGui::TextDisabled("(No epochs saved)");
-        } else {
-            for (auto const& [name, snip] : epochs) {
-                if (ImGui::Button(name.c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-                    state.scrubTime = (float)snip.time;
-                    state.timeTravelActive = true;
-                    addToast("Jumped to epoch: " + name, ToastType::Info);
-                }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Jump to Year %.2f", snip.time);
-                }
-            }
-        }
-
-        ImGui::Separator();
-        if (ImGui::Button("Clear History", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-            state.elapsedYears = 0;
-            state.timeTravelActive = false;
-            history.clear();
-            addToast("History cleared", ToastType::Warning);
-        }
-
-        ImGui::End();
-    }
-    
-    /**
-     * @brief Renders the body information panel.
-     */
-    static void renderBodyInfoPanel(const std::vector<Body>& bodies, SimulationState& state) {
-        ImGui::SetNextWindowPos(ImVec2(1000, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(270, 370), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Body Information", nullptr, ImGuiWindowFlags_NoCollapse);
-        
-        // A11y: Keyboard navigation hints
-        ImGui::TextDisabled("Use Up/Down arrows to navigate");
-        
-        if (ImGui::BeginCombo("Select Body", 
-            state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
-                ? bodies[state.selectedBody].name.c_str() : "(none)")) {
-            
-            if (ImGui::Selectable("(none)", state.selectedBody == -1)) {
-                state.selectedBody = -1;
-            }
-            for (int i = 0; i < (int)bodies.size(); ++i) {
-                if (bodies[i].name == "Asteroid") continue;
-                
-                bool isSelected = (state.selectedBody == i);
-                if (ImGui::Selectable(bodies[i].name.c_str(), isSelected)) {
-                    state.selectedBody = i;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        
-        // A11y: Keyboard body navigation (Up/Down when panel focused)
-        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive()) {
-            // Count non-asteroid bodies
-            int maxBody = -1;
-            for (int i = 0; i < (int)bodies.size(); ++i) {
-                if (bodies[i].name != "Asteroid") maxBody = i;
-            }
-            
-            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-                do {
-                    state.selectedBody = std::min(state.selectedBody + 1, maxBody);
-                } while (state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
-                         && bodies[state.selectedBody].name == "Asteroid");
-            }
-            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-                do {
-                    state.selectedBody = std::max(state.selectedBody - 1, -1);
-                } while (state.selectedBody >= 0 && bodies[state.selectedBody].name == "Asteroid");
-            }
-        }
-        
-        ImGui::Separator();
-        
-        if (state.selectedBody >= 0 && state.selectedBody < (int)bodies.size()) {
-            const Body& b = bodies[state.selectedBody];
-            
-            ImGui::TextColored(Theme::PrimaryHover, "Name: %s", b.name.c_str());
-            ImGui::Separator();
-            
-            ImGui::Text("Mass: %.6e M☉", b.mass);
-            ImGui::Text("Radius: %.6e AU", b.radius);
-            
-            ImGui::Separator();
-            ImGui::Text("Position (AU):");
-            ImGui::Text("  X: %.4f", b.position.x);
-            ImGui::Text("  Y: %.4f", b.position.y);
-            ImGui::Text("  Z: %.4f", b.position.z);
-            
-            double dist = b.position.length();
-            ImGui::Text("Distance: %.4f AU", dist);
-            
-            ImGui::Separator();
-            ImGui::Text("Velocity (AU/y):");
-            ImGui::Text("  X: %.4f", b.velocity.x);
-            ImGui::Text("  Y: %.4f", b.velocity.y);
-            ImGui::Text("  Z: %.4f", b.velocity.z);
-            
-            double speed = b.velocity.length();
-            ImGui::Text("Speed: %.4f AU/y", speed);
-            
-            if (dist > 0.01) {
-                double T = std::sqrt(dist * dist * dist);
-                ImGui::Text("Orbital Period: %.2f y", T);
-            }
-            
-            ImGui::Separator();
-            ImGui::Text("Rotation: %.1f°", b.rotationAngle);
-            ImGui::Text("Tilt: %.1f°", b.axialTilt);
-        } else {
-            ImGui::TextWrapped("Select a body from the dropdown to view its properties.");
-        }
-        
-        ImGui::End();
     }
 
     /**
@@ -549,6 +481,8 @@ public:
      * @brief Console stats output (fallback / legacy).
      */
     static void renderStats(const std::vector<Body>& bodies, double dt) {
+        (void)bodies;
+        (void)dt;
         // Legacy console output - now handled by ImGui
     }
 };

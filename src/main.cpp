@@ -24,8 +24,8 @@ int main() {
     }
     std::cout << "Loaded " << system.size() << " celestial bodies" << std::endl;
 
-    // Add asteroid belt (200 asteroids)
-    for (int i = 0; i < 200; ++i) {
+    // Add asteroid belt (100 asteroids for performance)
+    for (int i = 0; i < 100; ++i) {
         double d = 2.2 + (double)rand()/RAND_MAX * 1.0;  // 2.2-3.2 AU
         double a = (double)rand()/RAND_MAX * 2.0 * M_PI;
         double v = std::sqrt(39.478 / d);  // Circular orbit velocity
@@ -77,7 +77,15 @@ int main() {
     sf::Clock fpsClock;
     int frameCount = 0;
     
-    std::cout << "Controls: WASD (orbit camera), Scroll (zoom), or use GUI panels" << std::endl;
+    std::cout << "Controls: Mouse drag (orbit), Right-drag (pan), Scroll (zoom), or use GUI panels" << std::endl;
+    
+    // Set default body selection to Sun
+    for (int i = 0; i < (int)system.size(); ++i) {
+        if (system[i].name == "Sun") {
+            SolarSim::GuiEngine::getState().selectedBody = i;
+            break;
+        }
+    }
     
     SolarSim::HistoryManager history;
     bool wasTimeTravelActive = false;
@@ -90,6 +98,11 @@ int main() {
             
             if (event.type == sf::Event::Closed) {
                 window.close();
+            }
+            
+            // Handle window resize for fullscreen support
+            if (event.type == sf::Event::Resized) {
+                glViewport(0, 0, event.size.width, event.size.height);
             }
 
             // Global Hotkeys (only if not typing in ImGui)
@@ -147,7 +160,7 @@ int main() {
             
             // Add asteroids for Full Solar System preset
             if (guiState.presetRequest == 0) {
-                for (int i = 0; i < 200; ++i) {
+                for (int i = 0; i < 100; ++i) {
                     double d = 2.2 + (double)rand()/RAND_MAX * 1.0;
                     double a = (double)rand()/RAND_MAX * 2.0 * M_PI;
                     double v = std::sqrt(39.478 / d);
@@ -233,7 +246,7 @@ int main() {
         }
 
         // Render
-        graphics.render(system, guiState.showTrails, guiState.showAxes);
+        graphics.render(system, guiState.showTrails, guiState.showOrbits);
         SolarSim::GuiEngine::render(system, history, scalePtr, rotXPtr, rotZPtr);
         SolarSim::GuiEngine::display(window);
         window.display();

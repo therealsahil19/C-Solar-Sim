@@ -131,7 +131,17 @@ public:
     }
 
     /**
-     * @brief Calculates safe adaptive timestep.
+     * @brief Calculates a safe adaptive timestep based on the proximity of bodies.
+     * 
+     * The timestep is scaled such that bodies moving at high speeds during close 
+     * encounters are integrated with higher temporal resolution.
+     * 
+     * Formula: $dt = C \cdot \sqrt{min(dist^2)}$
+     * This prevents numerical divergence during "slingshot" maneuvers.
+     * 
+     * @param bodies Collection of celestial bodies
+     * @param baseDt The maximum allowable timestep (usually configured by user)
+     * @returns A clamped timestep value
      */
     static double getAdaptiveTimestep(const std::vector<Body>& bodies, double baseDt) {
         double minDistSq = 1e18;
@@ -172,13 +182,17 @@ public:
      * @brief Integrates system state using 4th-order Runge-Kutta (RK4).
      * 
      * RK4 provides a balance between computational cost and high-order accuracy.
-     * It samples the derivatives at four points within the timestep:
-     * 1. k1 = f(tn, yn)
-     * 2. k2 = f(tn + dt/2, yn + dt*k1/2)
-     * 3. k3 = f(tn + dt/2, yn + dt*k2/2)
-     * 4. k4 = f(tn + dt, yn + dt*k3)
+     * It samples the derivatives at four points within the timestep.
      * 
-     * Final state: yn+1 = yn + (dt/6)(k1 + 2k2 + 2k3 + k4)
+     * Math:
+     * Let $\dot{y} = f(t, y)$. The next state $y_{n+1}$ is:
+     * $k_1 = f(t_n, y_n)$
+     * $k_2 = f(t_n + \frac{h}{2}, y_n + h\frac{k_1}{2})$
+     * $k_3 = f(t_n + \frac{h}{2}, y_n + h\frac{k_2}{2})$
+     * $k_4 = f(t_n + h, y_n + h k_3)$
+     * $y_{n+1} = y_n + \frac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)$
+     * 
+     * In N-body context, $y$ contains both positions and velocities.
      * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years

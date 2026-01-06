@@ -18,6 +18,7 @@
 #include "ShaderProgram.hpp"
 #include "SphereRenderer.hpp"
 #include "Theme.hpp"
+#include "OrbitCalculator.hpp"
 
 namespace SolarSim {
 
@@ -43,6 +44,9 @@ private:
     // Instanced rendering for asteroids
     unsigned int asteroidInstanceVBO = 0;
     std::vector<glm::mat4> asteroidMatrices;
+    
+    // Orbit ellipse rendering
+    unsigned int orbitVAO = 0, orbitVBO = 0;
     
     // Lighting parameters
     float ambientStrength = 0.15f;
@@ -130,6 +134,10 @@ public:
         // Create asteroid instance VBO
         glGenBuffers(1, &asteroidInstanceVBO);
         
+        // Create orbit VAO/VBO
+        glGenVertexArrays(1, &orbitVAO);
+        glGenBuffers(1, &orbitVBO);
+        
         // Enable OpenGL features
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
@@ -156,7 +164,7 @@ public:
         camera.handleEvent(event);
     }
 
-    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showAxes = true) {
+    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showOrbits = true) {
         if (!initialized) {
             if (!init()) return;
         }
@@ -177,14 +185,16 @@ public:
         // Sun position (always at origin for lighting)
         glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
         
-        // Draw coordinate axes if enabled
-        if (showAxes) {
-            drawAxes(view, projection);
-        }
+        // Coordinate axes removed from GUI
         
         // Draw trails first (behind planets)
         if (showTrails) {
             drawTrails(bodies, view, projection);
+        }
+        
+        // Draw orbit ellipses
+        if (showOrbits) {
+            drawOrbits(bodies, view, projection);
         }
         
         // Draw all bodies (except asteroids, which are instanced)
@@ -353,6 +363,63 @@ private:
         glBindVertexArray(0);
     }
 
+    void drawOrbits(const std::vector<Body>& bodies, const glm::mat4& view, const glm::mat4& projection) {
+        trailShader.use();
+        trailShader.setMat4("view", view);
+        trailShader.setMat4("projection", projection);
+        
+        // Find the Sun (central body) for mu calculation
+        double sunMass = 1.0; // Default to 1 solar mass
+        for (const auto& body : bodies) {
+            if (body.name == "Sun") {
+                sunMass = body.mass;
+                break;
+            }
+        }
+        double mu = Constants::G * sunMass;
+        
+        for (const auto& body : bodies) {
+            // Skip the Sun, asteroids, and Moon (Moon orbits Earth, not Sun)
+            if (body.name == "Sun" || body.name == "Asteroid" || body.name == "Moon") continue;
+            
+            // Calculate orbital elements
+            OrbitalElements orbit = OrbitCalculator::calculateElements(body.position, body.velocity, mu);
+            
+            if (!orbit.isValid) continue;
+            
+            // Generate orbit path (64 points for smooth ellipse)
+            std::vector<Vector3> orbitPoints = OrbitCalculator::generateOrbitPath(orbit, 64);
+            
+            if (orbitPoints.size() < 2) continue;
+            
+            // Get body color
+            sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
+            
+            // Build orbit vertices with semi-transparent color
+            std::vector<float> vertices;
+            for (const auto& pt : orbitPoints) {
+                vertices.push_back((float)pt.x);
+                vertices.push_back((float)pt.z);  // Y-up convention
+                vertices.push_back((float)pt.y);
+                vertices.push_back(sfColor.r / 255.0f);
+                vertices.push_back(sfColor.g / 255.0f);
+                vertices.push_back(sfColor.b / 255.0f);
+                vertices.push_back(0.3f);  // Semi-transparent
+            }
+            
+            glBindVertexArray(orbitVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, orbitVBO);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+            
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
+            glEnableVertexAttribArray(1);
+            
+            glDrawArrays(GL_LINE_LOOP, 0, (GLsizei)orbitPoints.size());
+        }
+    }
+
     void drawAxes(const glm::mat4& view, const glm::mat4& projection) {
         trailShader.use();
         trailShader.setMat4("view", view);
@@ -387,6 +454,8 @@ public:
     ~GraphicsEngine() {
         if (trailVAO) glDeleteVertexArrays(1, &trailVAO);
         if (trailVBO) glDeleteBuffers(1, &trailVBO);
+        if (orbitVAO) glDeleteVertexArrays(1, &orbitVAO);
+        if (orbitVBO) glDeleteBuffers(1, &orbitVBO);
         for (auto& [name, tex] : glTextures) {
             glDeleteTextures(1, &tex);
         }
@@ -394,3 +463,4 @@ public:
 };
 
 } // namespace SolarSim
+

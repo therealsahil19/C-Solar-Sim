@@ -27,7 +27,7 @@ private:
     int longitudeSegments;
 
 public:
-    SphereRenderer(int latSegs = 32, int lonSegs = 32)
+    SphereRenderer(int latSegs = 16, int lonSegs = 16)
         : latitudeSegments(latSegs), longitudeSegments(lonSegs)
     {}
 
