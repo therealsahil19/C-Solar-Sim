@@ -80,7 +80,7 @@ public:
         , yaw(-90.0f)
         , pitch(30.0f)
         , fov(45.0f)
-        , nearPlane(0.01f)
+        , nearPlane(0.5f)
         , farPlane(1000.0f)
         , moveSpeed(5.0f)
         , zoomSpeed(5.0f)

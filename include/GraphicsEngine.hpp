@@ -65,7 +65,7 @@ private:
         if (name == "Mercury") return 15.0f / 0.39f;   // ~38.5
         if (name == "Venus") return 30.0f / 0.72f;     // ~41.7
         if (name == "Earth") return 50.0f / 1.0f;      // 50
-        if (name == "Moon") return 50.0f / 1.0f;       // Same as Earth
+        if (name == "Moon") return 1.0f;               // Special handling relative to Earth
         if (name == "Mars") return 75.0f / 1.52f;      // ~49.3
         if (name == "Asteroid") return 125.0f / 2.7f;  // ~46.3 (center of belt)
         if (name == "Jupiter") return 200.0f / 5.2f;   // ~38.5
@@ -101,6 +101,23 @@ private:
         return 1.0f;  // Default
     }
 
+public:
+    // Helper for shared Moon positioning logic
+    static glm::vec3 calculateMoonVisualPosition(const Body& moon, const Body& earth) {
+        glm::vec3 earthVisualPos = getVisualPosition(earth);
+        glm::vec3 earthRealPos(earth.position.x, earth.position.z, earth.position.y);
+        glm::vec3 moonRealPos(moon.position.x, moon.position.z, moon.position.y);
+
+        glm::vec3 relativePos = moonRealPos - earthRealPos;
+        // Scale the distance significantly so it's visible outside Earth
+        // Real distance ~0.00257 AU. Earth Visual Radius = 1.6.
+        // We need distance > 2.0. Scale factor ~1500x relative.
+        float relativeScale = 2000.0f;
+
+        return earthVisualPos + (relativePos * relativeScale);
+    }
+
+private:
     unsigned int loadTextureFromFile(const std::string& path) {
         sf::Image image;
         if (!image.loadFromFile(path)) {
@@ -185,6 +202,9 @@ public:
         
         // Enable OpenGL features
         glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
@@ -193,6 +213,12 @@ public:
     }
 
     Camera3D& getCamera() { return camera; }
+
+    glm::mat4 getViewProjectionMatrix() {
+        sf::Vector2u winSize = window.getSize();
+        float aspect = (float)winSize.x / (float)winSize.y;
+        return camera.getProjectionMatrix(aspect) * camera.getViewMatrix();
+    }
     
     // Expose controls for GUI compatibility
     void exposeControls(float*& scalePtr, float*& rotXPtr, float*& rotZPtr) {
@@ -247,6 +273,15 @@ public:
         // Disable blending for opaque bodies (fixes depth buffer issue)
         glDisable(GL_BLEND);
         
+        // Find Earth index for Moon positioning
+        int earthIndex = -1;
+        for (size_t i = 0; i < bodies.size(); ++i) {
+            if (bodies[i].name == "Earth") {
+                earthIndex = (int)i;
+                break;
+            }
+        }
+
         // Draw all bodies (except asteroids, which are instanced)
         asteroidMatrices.clear();
         for (const auto& body : bodies) {
@@ -259,6 +294,14 @@ public:
                 asteroidMatrices.push_back(model);
                 continue;
             }
+
+            // Special handling for Moon
+            if (body.name == "Moon" && earthIndex != -1) {
+                glm::vec3 visualPos = calculateMoonVisualPosition(body, bodies[earthIndex]);
+                drawBodyInternal(body, visualPos, view, projection, camPos, lightPos);
+                continue;
+            }
+
             drawBody(body, view, projection, camPos, lightPos);
         }
 
@@ -275,6 +318,13 @@ public:
 private:
     void drawBody(const Body& body, const glm::mat4& view, const glm::mat4& projection,
                   const glm::vec3& camPos, const glm::vec3& lightPos) {
+        glm::vec3 visualPos = getVisualPosition(body);
+        drawBodyInternal(body, visualPos, view, projection, camPos, lightPos);
+    }
+
+    void drawBodyInternal(const Body& body, const glm::vec3& visualPos,
+                          const glm::mat4& view, const glm::mat4& projection,
+                          const glm::vec3& camPos, const glm::vec3& lightPos) {
         
         // Get color
         sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
@@ -285,7 +335,6 @@ private:
         
         // Model matrix with visual position scaling
         glm::mat4 model = glm::mat4(1.0f);
-        glm::vec3 visualPos = getVisualPosition(body);
         model = glm::translate(model, visualPos);
         
         // Apply axial tilt

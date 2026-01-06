@@ -155,13 +155,25 @@ int main() {
         auto& guiState = SolarSim::GuiEngine::getState();
 
         // Helper to get visual position matching graphics rendering
-        auto getVisualPos = [](const SolarSim::Body& body) -> glm::vec3 {
+        // Note: This needs to access the full system for Moon relative positioning, but we capture it in lambda
+        auto getVisualPos = [&system](const SolarSim::Body& body) -> glm::vec3 {
+
+            // Special handling for Moon to match GraphicsEngine::drawMoon logic
+            if (body.name == "Moon") {
+                // Find Earth
+                for (const auto& b : system) {
+                    if (b.name == "Earth") {
+                        return SolarSim::GraphicsEngine::calculateMoonVisualPosition(body, b);
+                    }
+                }
+            }
+
             // Use same scale factors as GraphicsEngine::getVisualScale
             float scale = 1.0f;
             if (body.name == "Sun") scale = 1.0f;
             else if (body.name == "Mercury") scale = 15.0f / 0.39f;
             else if (body.name == "Venus") scale = 30.0f / 0.72f;
-            else if (body.name == "Earth" || body.name == "Moon") scale = 50.0f / 1.0f;
+            else if (body.name == "Earth") scale = 50.0f / 1.0f;
             else if (body.name == "Mars") scale = 75.0f / 1.52f;
             else if (body.name == "Asteroid") scale = 125.0f / 2.7f;
             else if (body.name == "Jupiter") scale = 200.0f / 5.2f;
@@ -343,6 +355,10 @@ int main() {
 
         // Render
         graphics.render(system, guiState.showTrails, guiState.showOrbits);
+
+        // Render Labels (after 3D scene, before UI)
+        SolarSim::GuiEngine::renderLabels(system, graphics.getViewProjectionMatrix(), window.getSize());
+
         SolarSim::GuiEngine::render(system, history, scalePtr, rotXPtr, rotZPtr);
         SolarSim::GuiEngine::display(window);
         window.display();
