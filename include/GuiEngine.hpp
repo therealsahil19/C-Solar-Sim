@@ -73,6 +73,11 @@ public:
         char epochName[64] = "Meeting of Worlds";
         std::string requestEpochJump = "";
 
+        // Ghost Visualization
+        bool showGhost = false;         ///< Toggle for historical overlay
+        float ghostOpacity = 0.4f;      ///< Transparency of ghost bodies
+        std::string selectedGhostEpoch = ""; ///< Which epoch to ghost (empty = current scrub position)
+
         // UI & UX state
         bool showHelp = false;          ///< Toggle for the help modal
         std::vector<Toast> toasts;      ///< Active notification queue
@@ -85,6 +90,7 @@ public:
         bool showTimeControls = true;
         bool showVisibility = true;
         bool showBodyInfo = true;
+        bool showTimeTravel = true;
     };
 
     static SimulationState& getState() {
@@ -175,22 +181,7 @@ public:
                 // Use shared logic from GraphicsEngine
                 worldPos = GraphicsEngine::calculateMoonVisualPosition(body, bodies[earthIndex]);
             } else {
-                 // Duplicate logic from GraphicsEngine::getVisualScale
-                 // Ideally this should also be exposed by GraphicsEngine, but for now
-                 // we only fixed the complex Moon logic which was the main offender.
-                 float scale = 40.0f;
-                 if (body.name == "Sun") scale = 1.0f;
-                 else if (body.name == "Mercury") scale = 15.0f / 0.39f;
-                 else if (body.name == "Venus") scale = 30.0f / 0.72f;
-                 else if (body.name == "Earth") scale = 50.0f / 1.0f;
-                 else if (body.name == "Mars") scale = 75.0f / 1.52f;
-                 else if (body.name == "Jupiter") scale = 200.0f / 5.2f;
-                 else if (body.name == "Saturn") scale = 350.0f / 9.54f;
-                 else if (body.name == "Uranus") scale = 600.0f / 19.2f;
-                 else if (body.name == "Neptune") scale = 900.0f / 30.0f;
-                 else if (body.name == "Pluto") scale = 1100.0f / 39.5f;
-
-                 worldPos = glm::vec3(body.position.x, body.position.z, body.position.y) * scale;
+                 worldPos = GraphicsEngine::getVisualPosition(body.position, body.name);
             }
 
             // Project to screen space
@@ -258,6 +249,121 @@ public:
                 ++it;
             }
         }
+    }
+
+    /**
+     * @brief Render Time-Travel panel (bottom-left, above Time Controls).
+     */
+    static void renderTimeTravelPanel(HistoryManager& history, SimulationState& state) {
+        if (!state.showTimeTravel) return;
+        
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 panelSize(300, 200);
+        // Position above Time Controls (10 + 160 + 10 = 180 from bottom for Time Controls)
+        ImVec2 panelPos(10, viewport->WorkSize.y - panelSize.y - 180);
+        
+        ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
+        
+        ImGui::Begin("Time-Travel", &state.showTimeTravel, 
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        
+        // Empty state
+        if (history.getHistorySize() < 2) {
+            ImGui::TextWrapped("Run the simulation to build history for time-travel.");
+            ImGui::End();
+            return;
+        }
+        
+        // Active indicator
+        if (state.timeTravelActive) {
+            ImGui::TextColored(Theme::Warning, "SCRUBBING - Simulation Paused");
+        } else {
+            ImGui::TextColored(Theme::Success, "Live Mode");
+        }
+        
+        // Timeline slider
+        float startTime = (float)history.getStartTime();
+        float endTime = (float)history.getEndTime();
+        
+        ImGui::Spacing();
+        ImGui::Text("Timeline (%.2f - %.2f years)", startTime, endTime);
+        ImGui::SetNextItemWidth(-1);
+        
+        float prevScrub = state.scrubTime;
+        if (!state.timeTravelActive) {
+            state.scrubTime = endTime; // Keep slider at end when live
+        }
+        
+        if (ImGui::SliderFloat("##Timeline", &state.scrubTime, startTime, endTime, "%.2f y")) {
+            // User is scrubbing
+            if (std::abs(state.scrubTime - prevScrub) > 0.001f) {
+                state.timeTravelActive = true;
+            }
+        }
+        ImGui::SetItemTooltip("Drag to travel through recorded history");
+        
+        // Resume button
+        if (state.timeTravelActive) {
+            if (ImGui::Button("Resume from Here", ImVec2(-1, 0))) {
+                state.timeTravelActive = false;
+                state.elapsedYears = state.scrubTime;
+                addToast("Resumed simulation", ToastType::Success);
+            }
+            ImGui::SetItemTooltip("Continue simulation from current position (discards future)");
+        }
+        
+        ImGui::Separator();
+        
+        // Epoch marking
+        ImGui::Text("Mark Epoch:");
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 80);
+        ImGui::InputText("##EpochName", state.epochName, sizeof(state.epochName));
+        ImGui::SameLine();
+        if (ImGui::Button("Mark", ImVec2(70, 0))) {
+            if (strlen(state.epochName) > 0) {
+                state.requestMarkEpoch = true;
+                addToast("Epoch marked: " + std::string(state.epochName), ToastType::Success);
+            }
+        }
+        ImGui::SetItemTooltip("Save current moment as a named epoch");
+        
+        // Epoch list
+        const auto& epochs = history.getEpochs();
+        if (!epochs.empty()) {
+            ImGui::Spacing();
+            ImGui::Text("Saved Epochs:");
+            for (const auto& [name, snapshot] : epochs) {
+                std::string label = name + " (" + std::to_string((int)snapshot.time) + "y)";
+                if (ImGui::Button(label.c_str(), ImVec2(-1, 0))) {
+                    state.requestEpochJump = name;
+                    state.timeTravelActive = true;
+                    state.scrubTime = (float)snapshot.time;
+                    addToast("Jumped to: " + name, ToastType::Info);
+                }
+            }
+        }
+
+        ImGui::Separator();
+        ImGui::TextColored(Theme::Accent, "Ghost Overlay");
+        ImGui::Checkbox("Show Ghost", &state.showGhost);
+        if (state.showGhost) {
+            ImGui::SliderFloat("Ghost Opacity", &state.ghostOpacity, 0.1f, 1.0f, "%.2f");
+            
+            if (ImGui::BeginCombo("Ghost State", state.selectedGhostEpoch.empty() ? "Current Scrub" : state.selectedGhostEpoch.c_str())) {
+                if (ImGui::Selectable("Current Scrub", state.selectedGhostEpoch.empty())) {
+                    state.selectedGhostEpoch = "";
+                }
+                for (const auto& [name, snapshot] : epochs) {
+                    if (ImGui::Selectable(name.c_str(), state.selectedGhostEpoch == name)) {
+                        state.selectedGhostEpoch = name;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+        
+        ImGui::End();
     }
 
     /**
@@ -450,25 +556,26 @@ public:
      */
     static void render(const std::vector<Body>& bodies, HistoryManager& history, float* scalePtr, 
                        float* rotXPtr, float* rotZPtr) {
-        (void)history;  // No longer used (epoch panel removed)
         (void)scalePtr; // Camera controls removed
         (void)rotXPtr;
         (void)rotZPtr;
         
         SimulationState& state = getState();
 
-        // Render the three fixed panels
+        // Render the four fixed panels
+        renderTimeTravelPanel(history, state);
         renderTimeControlsPanel(state);
         renderVisibilityPanel(state);
         renderBodyInfoPanel(bodies, state);
         
         // Panel re-open buttons (when panels are closed)
-        bool anyPanelClosed = !state.showTimeControls || !state.showVisibility || !state.showBodyInfo;
+        bool anyPanelClosed = !state.showTimeControls || !state.showVisibility || !state.showBodyInfo || !state.showTimeTravel;
         if (anyPanelClosed) {
             ImGuiViewport* viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(ImVec2(viewport->WorkSize.x / 2 - 100, 10), ImGuiCond_Always);
             ImGui::Begin("##PanelToggles", nullptr, 
                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+            if (!state.showTimeTravel && ImGui::Button("Show Time-Travel")) state.showTimeTravel = true;
             if (!state.showTimeControls && ImGui::Button("Show Time Controls")) state.showTimeControls = true;
             if (!state.showVisibility && ImGui::Button("Show Visibility")) state.showVisibility = true;
             if (!state.showBodyInfo && ImGui::Button("Show Body Info")) state.showBodyInfo = true;

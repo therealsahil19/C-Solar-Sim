@@ -19,6 +19,7 @@
 #include "SphereRenderer.hpp"
 #include "Theme.hpp"
 #include "OrbitCalculator.hpp"
+#include "HistoryManager.hpp"
 
 namespace SolarSim {
 
@@ -56,6 +57,7 @@ private:
     bool initialized = false;
     std::string shaderPath;
 
+public:
     // Visual scale multiplier - maps real AU to visual units
     // 
     // @philosophy
@@ -82,12 +84,12 @@ private:
         return 40.0f;  // Default scale
     }
 
-    static glm::vec3 getVisualPosition(const Body& body) {
-        float scale = getVisualScale(body.name);
+    static glm::vec3 getVisualPosition(const Vector3& pos, const std::string& name) {
+        float scale = getVisualScale(name);
         return glm::vec3(
-            (float)body.position.x * scale,
-            (float)body.position.z * scale,  // Y-up convention
-            (float)body.position.y * scale
+            (float)pos.x * scale,
+            (float)pos.z * scale,  // Y-up convention
+            (float)pos.y * scale
         );
     }
 
@@ -107,12 +109,10 @@ private:
         return 1.0f;  // Default
     }
 
-public:
     // Helper for shared Moon positioning logic
-    static glm::vec3 calculateMoonVisualPosition(const Body& moon, const Body& earth) {
-        glm::vec3 earthVisualPos = getVisualPosition(earth);
-        glm::vec3 earthRealPos(earth.position.x, earth.position.z, earth.position.y);
-        glm::vec3 moonRealPos(moon.position.x, moon.position.z, moon.position.y);
+    static glm::vec3 calculateMoonVisualPosition(const Vector3& moonPos, const Vector3& earthPos, const glm::vec3& earthVisualPos) {
+        glm::vec3 earthRealPos(earthPos.x, earthPos.z, earthPos.y);
+        glm::vec3 moonRealPos(moonPos.x, moonPos.z, moonPos.y);
 
         glm::vec3 relativePos = moonRealPos - earthRealPos;
         // Scale the distance significantly so it's visible outside Earth
@@ -122,6 +122,12 @@ public:
 
         return earthVisualPos + (relativePos * relativeScale);
     }
+    
+    // Legacy overload for backward compat within this file
+    static glm::vec3 calculateMoonVisualPosition(const Body& moon, const Body& earth) {
+        return calculateMoonVisualPosition(moon.position, earth.position, getVisualPosition(earth.position, earth.name));
+    }
+
 
 private:
     unsigned int loadTextureFromFile(const std::string& path) {
@@ -241,7 +247,8 @@ public:
         camera.handleEvent(event);
     }
 
-    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false) {
+    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false, 
+                const Snapshot* ghostSnapshot = nullptr, float ghostOpacity = 0.4f) {
         if (!initialized) {
             if (!init()) return;
         }
@@ -288,7 +295,7 @@ public:
             if (body.name == "Asteroid") {
                 float visualRadius = getVisualRadius("Asteroid");
                 glm::mat4 model = glm::mat4(1.0f);
-                glm::vec3 visualPos = getVisualPosition(body);
+                glm::vec3 visualPos = getVisualPosition(body.position, body.name);
                 model = glm::translate(model, visualPos);
                 model = glm::scale(model, glm::vec3(visualRadius));
                 asteroidMatrices.push_back(model);
@@ -298,7 +305,7 @@ public:
             // Special handling for Moon
             if (body.name == "Moon" && earthIndex != -1) {
                 glm::vec3 visualPos = calculateMoonVisualPosition(body, bodies[earthIndex]);
-                drawBodyInternal(body, visualPos, view, projection, camPos, lightPos);
+                drawBodyInternal(body.name, visualPos, body.axialTilt, (float)body.rotationAngle, view, projection, camPos, lightPos);
                 continue;
             }
 
@@ -332,6 +339,31 @@ public:
             drawOrbits(bodies, view, projection, showPlanetOrbits, showOtherOrbits);
         }
         
+        // ============= PASS 3: GHOST OVERLAY =============
+        if (ghostSnapshot && ghostSnapshot->bodyStates.size() == bodies.size()) {
+            for (size_t i = 0; i < bodies.size(); ++i) {
+                const auto& body = bodies[i];
+                if (body.name == "Asteroid") continue;
+
+                const auto& ghostState = ghostSnapshot->bodyStates[i];
+                glm::vec3 visualPos;
+
+                if (body.name == "Moon" && earthIndex != -1) {
+                    const auto& currentEarth = bodies[earthIndex];
+                    const auto& ghostEarth = ghostSnapshot->bodyStates[earthIndex];
+                    // Moon is relative to Earth. For the ghost, we use the recorded Earth-Moon relationship
+                    // but scaled to current visual Earth position? 
+                    // No, for a true drift visualization, we should probably ghost the whole system relative to origin.
+                    glm::vec3 ghostEarthVisualPos = getVisualPosition(ghostEarth.position, "Earth");
+                    visualPos = calculateMoonVisualPosition(ghostState.position, ghostEarth.position, ghostEarthVisualPos);
+                } else {
+                    visualPos = getVisualPosition(ghostState.position, body.name);
+                }
+
+                drawBodyInternal(body.name, visualPos, body.axialTilt, (float)ghostState.rotationAngle, view, projection, camPos, lightPos, ghostOpacity);
+            }
+        }
+        
         // Restore depth mask for next frame
         glDepthMask(GL_TRUE);
         
@@ -343,32 +375,34 @@ public:
 private:
     void drawBody(const Body& body, const glm::mat4& view, const glm::mat4& projection,
                   const glm::vec3& camPos, const glm::vec3& lightPos) {
-        glm::vec3 visualPos = getVisualPosition(body);
-        drawBodyInternal(body, visualPos, view, projection, camPos, lightPos);
+        glm::vec3 visualPos = getVisualPosition(body.position, body.name);
+        drawBodyInternal(body.name, visualPos, body.axialTilt, (float)body.rotationAngle, view, projection, camPos, lightPos);
     }
 
-    void drawBodyInternal(const Body& body, const glm::vec3& visualPos,
+    void drawBodyInternal(const std::string& name, const glm::vec3& visualPos,
+                          double axialTilt, float rotationAngle,
                           const glm::mat4& view, const glm::mat4& projection,
-                          const glm::vec3& camPos, const glm::vec3& lightPos) {
+                          const glm::vec3& camPos, const glm::vec3& lightPos,
+                          float opacity = 1.0f) {
         
         // Get color
-        sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
+        sf::Color sfColor = bodyColors.count(name) ? bodyColors.at(name) : sf::Color::White;
         glm::vec3 color(sfColor.r / 255.0f, sfColor.g / 255.0f, sfColor.b / 255.0f);
         
         // Use visual radius from lookup
-        float visualRadius = getVisualRadius(body.name);
+        float visualRadius = getVisualRadius(name);
         
         // Model matrix with visual position scaling
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, visualPos);
         
         // Apply axial tilt
-        if (body.axialTilt != 0) {
-            model = glm::rotate(model, glm::radians((float)body.axialTilt), glm::vec3(0.0f, 0.0f, 1.0f));
+        if (axialTilt != 0) {
+            model = glm::rotate(model, glm::radians((float)axialTilt), glm::vec3(0.0f, 0.0f, 1.0f));
         }
         
         // Apply rotation
-        model = glm::rotate(model, glm::radians((float)body.rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
         
         // Scale
         model = glm::scale(model, glm::vec3(visualRadius));
@@ -377,7 +411,7 @@ private:
         glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(model)));
         
         // Choose shader
-        bool isSun = (body.name == "Sun");
+        bool isSun = (name == "Sun");
         ShaderProgram& shader = isSun ? sunShader : planetShader;
         shader.use();
         
@@ -386,13 +420,14 @@ private:
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         shader.setVec3("objectColor", color);
+        shader.setFloat("opacity", opacity);
         
         // Check for texture
-        bool hasTexture = glTextures.count(body.name) > 0;
+        bool hasTexture = glTextures.count(name) > 0;
         shader.setBool("useTexture", hasTexture);
         if (hasTexture) {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, glTextures.at(body.name));
+            glBindTexture(GL_TEXTURE_2D, glTextures.at(name));
             shader.setInt("planetTexture", 0);
         }
         
@@ -425,9 +460,10 @@ private:
             std::vector<float> vertices;
             for (size_t i = 0; i < body.trail.size(); ++i) {
                 float alpha = 0.4f * (float)i / (float)body.trail.size();
-                vertices.push_back((float)body.trail[i].x * scale);
-                vertices.push_back((float)body.trail[i].z * scale);  // Y-up
-                vertices.push_back((float)body.trail[i].y * scale);
+                glm::vec3 visualPt = getVisualPosition(body.trail[i], body.name);
+                vertices.push_back(visualPt.x);
+                vertices.push_back(visualPt.y);  // Y-up convention handled by getVisualPosition
+                vertices.push_back(visualPt.z);
                 vertices.push_back(sfColor.r / 255.0f);
                 vertices.push_back(sfColor.g / 255.0f);
                 vertices.push_back(sfColor.b / 255.0f);
@@ -539,9 +575,10 @@ private:
             float scale = getVisualScale(body.name);
             std::vector<float> vertices;
             for (const auto& pt : orbitPoints) {
-                vertices.push_back((float)pt.x * scale);
-                vertices.push_back((float)pt.z * scale);  // Y-up convention
-                vertices.push_back((float)pt.y * scale);
+                glm::vec3 visualPt = getVisualPosition(pt, body.name);
+                vertices.push_back(visualPt.x);
+                vertices.push_back(visualPt.y);  // Y-up convention handled by getVisualPosition
+                vertices.push_back(visualPt.z);
                 vertices.push_back(sfColor.r / 255.0f);
                 vertices.push_back(sfColor.g / 255.0f);
                 vertices.push_back(sfColor.b / 255.0f);

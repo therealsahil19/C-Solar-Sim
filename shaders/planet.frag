@@ -16,6 +16,7 @@ uniform sampler2D planetTexture;
 uniform float ambientStrength;
 uniform float specularStrength;
 uniform float shininess;
+uniform float opacity; // Added for ghost visualization
 
 void main()
 {
@@ -44,5 +45,5 @@ void main()
     
     // Combine lighting components
     vec3 result = ambient + diffuse + specular;
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(result, opacity);
 }

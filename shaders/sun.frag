@@ -10,6 +10,7 @@ uniform bool useTexture;
 uniform sampler2D planetTexture;
 uniform vec3 objectColor;
 uniform float glowIntensity;
+uniform float opacity; // Added for ghost visualization
 
 void main()
 {
@@ -22,5 +23,5 @@ void main()
     
     // Sun is emissive - no lighting calculation, just brighten
     vec3 emissive = baseColor * glowIntensity;
-    FragColor = vec4(emissive, 1.0);
+    FragColor = vec4(emissive, opacity);
 }

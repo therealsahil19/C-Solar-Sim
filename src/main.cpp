@@ -179,34 +179,11 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-            float scale = 1.0f;
-            if (body.name == "Sun") scale = 1.0f;
-            else if (body.name == "Mercury") scale = 15.0f / 0.39f;
-            else if (body.name == "Venus") scale = 30.0f / 0.72f;
-            else if (body.name == "Earth") scale = 50.0f / 1.0f;
-            else if (body.name == "Mars") scale = 75.0f / 1.52f;
-            else if (body.name == "Jupiter") scale = 200.0f / 5.2f;
-            else if (body.name == "Saturn") scale = 350.0f / 9.54f;
-            else if (body.name == "Uranus") scale = 600.0f / 19.2f;
-            else if (body.name == "Neptune") scale = 900.0f / 30.0f;
-            else if (body.name == "Pluto") scale = 1100.0f / 39.5f;
-            else scale = 40.0f;
-            return glm::vec3((float)body.position.x * scale, (float)body.position.z * scale, (float)body.position.y * scale);
+            return SolarSim::GraphicsEngine::getVisualPosition(body.position, body.name);
         };
 
         auto getVisualRad = [](const std::string& name) -> float {
-            if (name == "Sun") return 5.0f;
-            if (name == "Mercury") return 0.8f;
-            if (name == "Venus") return 1.5f;
-            if (name == "Earth") return 1.6f;
-            if (name == "Moon") return 0.4f;
-            if (name == "Mars") return 1.0f;
-            if (name == "Jupiter") return 4.0f;
-            if (name == "Saturn") return 3.5f;
-            if (name == "Uranus") return 2.5f;
-            if (name == "Neptune") return 2.4f;
-            if (name == "Pluto") return 0.5f;
-            return 1.0f;
+            return SolarSim::GraphicsEngine::getVisualRadius(name);
         };
 
         // MISSION LOGIC
@@ -322,8 +299,37 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Physics
-        if (!guiState.paused) {
+        // Time-Travel Logic
+        if (guiState.timeTravelActive) {
+            // Scrubbing through history - restore state
+            history.getStateAt(guiState.scrubTime, system);
+            
+            // Handle requests to resume from current position
+            if (!guiState.timeTravelActive) {
+                // User clicked "Resume" - truncate future history
+                history.truncateAfter(guiState.scrubTime);
+            }
+        }
+        
+        // Handle epoch marking
+        if (guiState.requestMarkEpoch) {
+            history.markEpoch(guiState.epochName, guiState.elapsedYears, system);
+            guiState.requestMarkEpoch = false;
+        }
+        
+        // Handle epoch jumping
+        if (!guiState.requestEpochJump.empty()) {
+            const auto& epochs = history.getEpochs();
+            auto it = epochs.find(guiState.requestEpochJump);
+            if (it != epochs.end()) {
+                history.getStateAt(it->second.time, system);
+                guiState.scrubTime = (float)it->second.time;
+            }
+            guiState.requestEpochJump = "";
+        }
+
+        // Physics (skip if time-traveling)
+        if (!guiState.paused && !guiState.timeTravelActive) {
             double frameTime = baseDt * guiState.timeRate;
             double currentT = 0;
             while (currentT < frameTime) {
@@ -341,7 +347,30 @@ int main(int argc, char* argv[]) {
         }
 
         // Rendering
-        graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits);
+        const SolarSim::Snapshot* ghostSnapshot = nullptr;
+        static SolarSim::Snapshot scrubGhost;
+        static bool hasScrubGhost = false;
+
+        if (guiState.showGhost) {
+            if (guiState.selectedGhostEpoch.empty()) {
+                // Ghost follows the current scrubbed state if active
+                if (guiState.timeTravelActive) {
+                    scrubGhost.time = (double)guiState.scrubTime;
+                    scrubGhost.bodyStates.clear();
+                    for (const auto& b : system) {
+                        scrubGhost.bodyStates.push_back({b.position, b.velocity, b.rotationAngle});
+                    }
+                    hasScrubGhost = true;
+                }
+                if (hasScrubGhost) ghostSnapshot = &scrubGhost;
+            } else {
+                const auto& epochs = history.getEpochs();
+                auto it = epochs.find(guiState.selectedGhostEpoch);
+                if (it != epochs.end()) ghostSnapshot = &it->second;
+            }
+        }
+
+        graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits, ghostSnapshot, guiState.ghostOpacity);
         SolarSim::GuiEngine::renderLabels(system, graphics.getViewProjectionMatrix(), window.getSize());
         SolarSim::GuiEngine::render(system, history, scalePtr, rotXPtr, rotZPtr);
         SolarSim::GuiEngine::display(window);
