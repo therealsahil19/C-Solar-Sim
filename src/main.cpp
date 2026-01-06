@@ -161,78 +161,6 @@ int main(int argc, char* argv[]) {
 
         auto& guiState = SolarSim::GuiEngine::getState();
 
-        // MISSION LOGIC
-        if (isMission) {
-            missionTimer += dtSec;
-            guiState.paused = false;
-            guiState.timeRate = 1.0f;
-
-            if (missionStep == 0) { // Initial wait for assets
-                if (missionTimer > 2.0f) {
-                    // Navigate to Mercury
-                    for (int i = 0; i < (int)system.size(); ++i) {
-                        if (system[i].name == "Mercury") {
-                            guiState.selectedBody = i;
-                            break;
-                        }
-                    }
-                    missionStep = 1;
-                    missionTimer = 0.0f;
-                }
-            } 
-            else if (missionStep == 1) { // Capture Mercury
-                if (missionTimer > 1.0f) {
-                    captureScreen(window, "mercury.png");
-                    // Navigate to Saturn
-                    for (int i = 0; i < (int)system.size(); ++i) {
-                        if (system[i].name == "Saturn") {
-                            guiState.selectedBody = i;
-                            break;
-                        }
-                    }
-                    missionStep = 2;
-                    missionTimer = 0.0f;
-                }
-            }
-            else if (missionStep == 2) { // Capture Saturn
-                if (missionTimer > 1.5f) {
-                    captureScreen(window, "saturn.png");
-                    // Navigate to Earth for Video
-                    for (int i = 0; i < (int)system.size(); ++i) {
-                        if (system[i].name == "Earth") {
-                            guiState.selectedBody = i;
-                            break;
-                        }
-                    }
-                    missionStep = 3;
-                    missionTimer = 0.0f;
-                }
-            }
-            else if (missionStep == 3) { // Setup Earth Video
-                if (missionTimer > 1.0f) {
-                    missionStep = 4;
-                    missionTimer = 0.0f;
-                }
-            }
-            else if (missionStep == 4) { // Recording Earth 360
-                float angle = (float)videoFramesCaptured / MAX_VIDEO_FRAMES * 360.0f;
-                // Directly set camera yaw and pitch via pointers
-                if (graphics.getCamera().getYawPtr()) *graphics.getCamera().getYawPtr() = angle - 90.0f;
-                if (graphics.getCamera().getPitchPtr()) *graphics.getCamera().getPitchPtr() = 20.0f;
-                graphics.getCamera().update();
-                
-                char filename[64];
-                sprintf(filename, "frames/frame_%03d.png", videoFramesCaptured);
-                captureScreen(window, filename);
-                
-                videoFramesCaptured++;
-                if (videoFramesCaptured >= MAX_VIDEO_FRAMES) {
-                    missionStep = 5;
-                    std::cout << "Successfully completed mission." << std::endl;
-                    window.close();
-                }
-            }
-        }
 
         // FPS Calculation
         frameCount++;
@@ -280,6 +208,82 @@ int main(int argc, char* argv[]) {
             if (name == "Pluto") return 0.5f;
             return 1.0f;
         };
+
+        // MISSION LOGIC
+        if (isMission) {
+            missionTimer += dtSec;
+            guiState.paused = false;
+            guiState.timeRate = 1.0f;
+
+            if (missionStep == 0) { // Initial wait for assets
+                if (missionTimer > 2.0f) {
+                    // Navigate to Jupiter
+                    for (int i = 0; i < (int)system.size(); ++i) {
+                        if (system[i].name == "Jupiter") {
+                            guiState.selectedBody = i;
+                            break;
+                        }
+                    }
+                    missionStep = 1;
+                    missionTimer = 0.0f;
+                }
+            } 
+            else if (missionStep == 1) { // Setup Close-up
+                if (missionTimer > 1.0f) {
+                    float jupiterRad = getVisualRad("Jupiter");
+                    graphics.getCamera().setMinDistance(jupiterRad * 1.2f);
+                    *graphics.getCamera().getDistancePtr() = jupiterRad * 2.0f; // Start a bit back
+                    *graphics.getCamera().getYawPtr() = -90.0f;
+                    *graphics.getCamera().getPitchPtr() = 10.0f;
+                    graphics.getCamera().update();
+                    missionStep = 2;
+                    missionTimer = 0.0f;
+                }
+            }
+            else if (missionStep >= 2 && missionStep <= 5) { // Capture 4 Angles
+                if (missionTimer > 0.5f) {
+                    int angleIndex = missionStep - 2;
+                    float yaw = -90.0f + angleIndex * 90.0f;
+                    *graphics.getCamera().getYawPtr() = yaw;
+                    *graphics.getCamera().getDistancePtr() = getVisualRad("Jupiter") * 1.5f; // Very close
+                    graphics.getCamera().update();
+                    
+                    char filename[64];
+                    sprintf(filename, "jupiter_%d.png", angleIndex + 1);
+                    captureScreen(window, filename);
+                    
+                    missionStep++;
+                    missionTimer = 0.0f;
+                }
+            }
+            else if (missionStep == 6) { // Prepare 360 Recording
+                if (missionTimer > 0.5f) {
+                    missionStep = 7;
+                    missionTimer = 0.0f;
+                    videoFramesCaptured = 0;
+                }
+            }
+            else if (missionStep == 7) { // Recording Jupiter 360 (Simulated User Flow)
+                float startYaw = -90.0f;
+                float currentYaw = startYaw + ((float)videoFramesCaptured / MAX_VIDEO_FRAMES) * 360.0f;
+                
+                *graphics.getCamera().getYawPtr() = currentYaw;
+                *graphics.getCamera().getPitchPtr() = 5.0f; // Slightly lower angle for surface feel
+                *graphics.getCamera().getDistancePtr() = getVisualRad("Jupiter") * 1.8f;
+                graphics.getCamera().update();
+                
+                char filename[64];
+                sprintf(filename, "frames/jupiter_%03d.png", videoFramesCaptured);
+                captureScreen(window, filename);
+                
+                videoFramesCaptured++;
+                if (videoFramesCaptured >= MAX_VIDEO_FRAMES) {
+                    missionStep = 8;
+                    std::cout << "Successfully completed Jupiter mission." << std::endl;
+                    window.close();
+                }
+            }
+        }
 
         // Camera Logic
         if (guiState.selectedBody != guiState.lastSelectedBody) {

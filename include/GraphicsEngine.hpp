@@ -256,22 +256,13 @@ public:
         // Sun position (always at origin for lighting)
         glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
         
-        // Enable blending for trails and orbits (they need transparency)
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        // Draw trails first (behind planets)
-        if (showTrails) {
-            drawTrails(bodies, view, projection);
-        }
-        
-        // Draw orbit ellipses
-        if (showPlanetOrbits || showOtherOrbits) {
-            drawOrbits(bodies, view, projection, showPlanetOrbits, showOtherOrbits);
-        }
-        
-        // Disable blending for opaque bodies (fixes depth buffer issue)
-        glDisable(GL_BLEND);
+        // ============= PASS 1: OPAQUE OBJECTS (planets) =============
+        // Draw opaque bodies FIRST with depth testing and writing enabled
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);  // Enable depth writing
+        glDisable(GL_BLEND);   // Opaque, no blending
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
         
         // Find Earth index for Moon positioning
         int earthIndex = -1;
@@ -309,6 +300,27 @@ public:
         if (!asteroidMatrices.empty()) {
             drawAsteroidsInstanced(view, projection, camPos, lightPos);
         }
+        
+        // ============= PASS 2: TRANSPARENT OBJECTS (trails/orbits) =============
+        // Draw transparent objects AFTER opaque ones
+        // Depth testing ON (so they're occluded by planets), but depth writing OFF
+        glDepthMask(GL_FALSE);  // Disable depth writing for transparent objects
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);  // Lines don't need culling
+        
+        // Draw trails
+        if (showTrails) {
+            drawTrails(bodies, view, projection);
+        }
+        
+        // Draw orbit ellipses
+        if (showPlanetOrbits || showOtherOrbits) {
+            drawOrbits(bodies, view, projection, showPlanetOrbits, showOtherOrbits);
+        }
+        
+        // Restore depth mask for next frame
+        glDepthMask(GL_TRUE);
         
         // Reset OpenGL state for ImGui
         glBindVertexArray(0);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "glad.h"
+
 #include <imgui.h>
 #include <imgui-SFML.h>
 #include <SFML/Graphics.hpp>
@@ -11,6 +13,9 @@
 #include "StateManager.hpp"
 #include "HistoryManager.hpp"
 #include "Theme.hpp"
+
+// Forward declare GraphicsEngine to avoid circular dependency
+namespace SolarSim { class GraphicsEngine; }
 
 namespace SolarSim {
 
@@ -199,6 +204,22 @@ public:
             // Convert NDC to screen coordinates
             float x = (ndc.x + 1.0f) * 0.5f * windowSize.x;
             float y = (1.0f - ndc.y) * 0.5f * windowSize.y; // Flip Y
+
+            // Depth occlusion check: read depth buffer at label position
+            // If something is closer than the label (depth < label's depth), skip
+            float labelDepth = (ndc.z + 1.0f) * 0.5f; // Convert from [-1,1] to [0,1]
+            float depthValue = 1.0f;
+            
+            // Read pixel depth from OpenGL depth buffer
+            int px = (int)x;
+            int py = (int)(windowSize.y - y); // OpenGL Y is flipped
+            if (px >= 0 && px < (int)windowSize.x && py >= 0 && py < (int)windowSize.y) {
+                glReadPixels(px, py, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depthValue);
+            }
+            
+            // If the depth buffer has something closer, skip this label
+            // Use small epsilon for floating point comparison
+            if (depthValue < labelDepth - 0.001f) continue;
 
             // Adjust label position (above the planet)
             y -= 20.0f;

@@ -36,6 +36,7 @@ private:
     float minOrbitDistance;  // Minimum zoom distance (prevents clipping into planets)
     float yaw;
     float pitch;
+    float roll;              // Camera roll (tilt) angle in degrees
 
     // Camera settings
     float fov;
@@ -51,6 +52,7 @@ private:
     // Mouse state tracking
     bool leftMouseDown = false;
     bool rightMouseDown = false;
+    bool middleMouseDown = false;  // For roll control
     int lastMouseX = 0;
     int lastMouseY = 0;
 
@@ -60,11 +62,44 @@ private:
         newFront.y = sin(glm::radians(pitch));
         newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
         front = glm::normalize(newFront);
-        right = glm::normalize(glm::cross(front, worldUp));
-        up = glm::normalize(glm::cross(right, front));
-
+        
+        // Calculate camera position first
         if (mode == CameraMode::Orbit || mode == CameraMode::Follow) {
             position = focusPoint - front * orbitDistance;
+        }
+        
+        // SPHERICAL CAMERA: Derive up from the radial direction (camera to focus)
+        // This makes the camera automatically tilt when orbiting, showing planets
+        // from their true perspective (poles visible when looking from above)
+        glm::vec3 radialOut = glm::normalize(position - focusPoint);
+        
+        // Handle edge case: when looking straight down or up, radialOut is parallel to front
+        // In this case, we fall back to worldUp
+        float dotVal = std::abs(glm::dot(radialOut, front));
+        glm::vec3 baseUp;
+        if (dotVal > 0.99f) {
+            // Near gimbal lock, use worldUp as fallback
+            baseUp = worldUp;
+        } else {
+            // Normal case: use radial direction as base for up
+            // The "up" should point away from focus (towards "outer space")
+            baseUp = radialOut;
+        }
+        
+        // Compute right and up from baseUp (Gram-Schmidt orthogonalization)
+        glm::vec3 initialRight = glm::normalize(glm::cross(front, baseUp));
+        glm::vec3 initialUp = glm::normalize(glm::cross(initialRight, front));
+        
+        // Apply manual roll rotation around the front axis
+        if (roll != 0.0f) {
+            float rollRad = glm::radians(roll);
+            float cosRoll = cos(rollRad);
+            float sinRoll = sin(rollRad);
+            right = initialRight * cosRoll + initialUp * sinRoll;
+            up = -initialRight * sinRoll + initialUp * cosRoll;
+        } else {
+            right = initialRight;
+            up = initialUp;
         }
     }
 
@@ -79,6 +114,7 @@ public:
         , minOrbitDistance(1.0f)  // Default minimum
         , yaw(-90.0f)
         , pitch(30.0f)
+        , roll(0.0f)  // Start with no roll
         , fov(45.0f)
         , nearPlane(0.5f)
         , farPlane(15000.0f)
@@ -96,7 +132,10 @@ public:
     }
 
     glm::mat4 getProjectionMatrix(float aspectRatio) const {
-        return glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
+        // Dynamic near plane: scales with distance to improve depth precision at close range
+        // Clamp to minimum of 0.1f to avoid extreme precision loss
+        float dynamicNear = std::max(0.1f, orbitDistance * 0.005f);
+        return glm::perspective(glm::radians(fov), aspectRatio, dynamicNear, farPlane);
     }
 
     glm::vec3 getPosition() const { return position; }
@@ -130,6 +169,7 @@ public:
         minOrbitDistance = 1.0f;
         yaw = -90.0f;
         pitch = 30.0f;
+        roll = 0.0f;  // Reset roll
         mode = CameraMode::Orbit;
         updateCameraVectors();
     }
@@ -138,6 +178,7 @@ public:
     float* getDistancePtr() { return &orbitDistance; }
     float* getYawPtr() { return &yaw; }
     float* getPitchPtr() { return &pitch; }
+    float* getRollPtr() { return &roll; }
     float* getFovPtr() { return &fov; }
 
     void handleEvent(const sf::Event& event) {
@@ -163,6 +204,11 @@ public:
                 lastMouseX = event.mouseButton.x;
                 lastMouseY = event.mouseButton.y;
             }
+            if (event.mouseButton.button == sf::Mouse::Middle) {
+                middleMouseDown = true;
+                lastMouseX = event.mouseButton.x;
+                lastMouseY = event.mouseButton.y;
+            }
         }
 
         // Mouse button release
@@ -172,6 +218,9 @@ public:
             }
             if (event.mouseButton.button == sf::Mouse::Right) {
                 rightMouseDown = false;
+            }
+            if (event.mouseButton.button == sf::Mouse::Middle) {
+                middleMouseDown = false;
             }
         }
 
@@ -198,6 +247,16 @@ public:
                     float panScale = orbitDistance * panSpeed * 0.01f;
                     focusPoint -= right * static_cast<float>(deltaX) * panScale;
                     focusPoint += up * static_cast<float>(deltaY) * panScale;
+                    updateCameraVectors();
+                }
+            }
+            
+            if (middleMouseDown) {
+                // Middle drag: Roll the camera
+                if (mode == CameraMode::Orbit || mode == CameraMode::Follow) {
+                    roll += static_cast<float>(deltaX) * rotateSpeed;
+                    // Clamp roll to reasonable range
+                    roll = std::fmod(roll + 180.0f, 360.0f) - 180.0f;
                     updateCameraVectors();
                 }
             }
