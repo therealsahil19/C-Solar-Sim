@@ -44,6 +44,8 @@ public:
      * - Extracts position components to local variables to reduce struct access
      * - Accumulates accelerations locally before writing back
      * - Computes invDist once and derives invDist3 from it (faster than 1/sqrt^3)
+     * 
+     * @note This is an O(N^2) implementation. For large N, use Barnes-Hut.
      */
     static void calculateAccelerations(std::vector<Body>& bodies) {
         for (auto& body : bodies) body.resetAcceleration();
@@ -184,15 +186,16 @@ public:
      * RK4 provides a balance between computational cost and high-order accuracy.
      * It samples the derivatives at four points within the timestep.
      * 
-     * Math:
-     * Let $\dot{y} = f(t, y)$. The next state $y_{n+1}$ is:
-     * $k_1 = f(t_n, y_n)$
-     * $k_2 = f(t_n + \frac{h}{2}, y_n + h\frac{k_1}{2})$
-     * $k_3 = f(t_n + \frac{h}{2}, y_n + h\frac{k_2}{2})$
-     * $k_4 = f(t_n + h, y_n + h k_3)$
+     * @details
+     * Let $\dot{y} = f(t, y)$ be the differential equation. The next state $y_{n+1}$ is:
+     * 1. $k_1 = f(t_n, y_n)$ - Initial slope
+     * 2. $k_2 = f(t_n + \frac{h}{2}, y_n + h\frac{k_1}{2})$ - Slope at midpoint using $k_1$
+     * 3. $k_3 = f(t_n + \frac{h}{2}, y_n + h\frac{k_2}{2})$ - Slope at midpoint using $k_2$
+     * 4. $k_4 = f(t_n + h, y_n + h k_3)$ - Slope at end using $k_3$
      * $y_{n+1} = y_n + \frac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)$
      * 
-     * In N-body context, $y$ contains both positions and velocities.
+     * In the N-body context, $y$ is a vector of $[positions, velocities]$.
+     * The function $f$ computes $[velocities, accelerations]$.
      * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years
@@ -250,9 +253,16 @@ public:
      * partitions space into an Octree. For distant clusters of bodies, we calculate
      * the force from the cluster's center of mass rather than individual bodies.
      * 
+     * @logic
+     * 1. Rebuild Octree from current body positions.
+     * 2. Calculate COM (Center of Mass) and Total Mass for every node.
+     * 3. For each body, traverse tree:
+     *    - If node is far enough ($s/d < \theta$), apply approximation.
+     *    - Otherwise, recurse into children.
+     * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years
-     * @param theta Accuracy parameter; lower is more accurate (typically 0.5)
+     * @param theta Accuracy parameter ($\theta$); lower is more accurate (typically 0.5)
      */
     static void stepBarnesHut(std::vector<Body>& bodies, double dt, double theta = 0.5) {
         static OctreePool pool;

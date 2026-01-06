@@ -57,8 +57,14 @@ private:
     std::string shaderPath;
 
     // Visual scale multiplier - maps real AU to visual units
-    // Real distances: Mercury=0.39, Venus=0.72, Earth=1.0, Mars=1.52, Jupiter=5.2, Saturn=9.5, Uranus=19.2, Neptune=30
-    // Desired visual: Mercury=15, Venus=30, Earth=50, Mars=75, Jupiter=200, Saturn=350, Uranus=600, Neptune=900
+    // 
+    // @philosophy
+    // Space is mostly empty. If we rendered to scale, the Sun would be a sub-pixel
+    // speck or the planets would be light-years apart. To create a navigable
+    // simulation, we apply a "Human-Scale Map":
+    // 1. Inner Planets: Higher scale factor to keep them distinct from the Sun.
+    // 2. Outer Giants: Lower scale factor to keep the system compact enough to view.
+    // 3. Moon: Special relative scaling to keep it visible near Earth.
     static float getVisualScale(const std::string& name) {
         // Scale factors derived from: visual_distance / real_distance
         if (name == "Sun") return 1.0f;  // Origin
@@ -256,8 +262,11 @@ public:
         // Sun position (always at origin for lighting)
         glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
         
-        // ============= PASS 1: OPAQUE OBJECTS (planets) =============
-        // Draw opaque bodies FIRST with depth testing and writing enabled
+        // ============= PASS 1: OPAQUE OBJECTS (Planets) =============
+        // To ensure correct occlusion, we draw solid spheres first.
+        // - Depth testing: ON
+        // - Depth writing: ON
+        // - Alpha blending: OFF
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_TRUE);  // Enable depth writing
         glDisable(GL_BLEND);   // Opaque, no blending
@@ -301,9 +310,13 @@ public:
             drawAsteroidsInstanced(view, projection, camPos, lightPos);
         }
         
-        // ============= PASS 2: TRANSPARENT OBJECTS (trails/orbits) =============
-        // Draw transparent objects AFTER opaque ones
-        // Depth testing ON (so they're occluded by planets), but depth writing OFF
+        // ============= PASS 2: TRANSPARENT OBJECTS (Trails/Orbits) =============
+        // Transparent objects must be drawn LAST. They sample the depth buffer
+        // to see if they are behind a planet, but do NOT write their own depth,
+        // preventing them from occluding objects behind them.
+        // - Depth testing: ON
+        // - Depth writing: OFF
+        // - Alpha blending: ON
         glDepthMask(GL_FALSE);  // Disable depth writing for transparent objects
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

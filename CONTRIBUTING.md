@@ -46,10 +46,26 @@ The suite checks:
 
 ## Documentation Standards
 As **Scribe** says: "If it isn't documented, it doesn't exist."
-- Use **Doxygen** style for C++ headers (`/** ... */`).
-- Use `@brief`, `@param`, and `@returns` for functions.
-- Explain the **Why**, not just the **What**.
-- Include math references (e.g., LaTeX-style or descriptive) for physics algorithms.
+
+### The Scribe Checklist:
+- **Language**: Technical but accessible.
+- **Doxygen**: Required for all public headers.
+- **Formulae**: If an algorithm is from a paper or textbook, cite it or explain the math.
+- **Why > What**: Don't just say `// i++`. Say `// Increment to next octant`.
+
+## Thinking in SolarSim 🌌
+
+When adding a new feature, keep these internal standards in mind:
+
+### 1. The Barycentric Frame
+Everything in the simulation is calculated relative to the Solar System Barycenter (SSB). If you add a body, ensure you re-calculate the system's center of mass and momentum.
+
+### 2. Space is Huge, Sim is Small
+We use **Double Precision** (`double`) for all physics but **Single Precision** (`float`) for most graphics. Be mindful of casting and precision loss during the Bridge (Physics -> Graphics).
+
+### 3. Coordinate System
+- **Physics**: standard $X, Y, Z$.
+- **Graphics (OpenGL)**: $Y$ is UP. Our bridge biasanya maps Physics $Z$ to Graphics $Y$.
 
 ## Development Setup
 Check the `README.md` for build instructions. We recommend using Visual Studio 2022 on Windows or GCC/Clang on Linux.

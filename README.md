@@ -38,6 +38,40 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 - Body information panel with orbital details
 - Preset scenarios (Inner Planets, Outer Giants, Earth-Moon, Binary Star)
 - Save/Load simulation state
+- **Historial Tracking**: Undo/Redo simulation steps and mark significant epochs
+
+## Design Philosophy
+
+SolarSim is built on three core pillars:
+1. **Physical Accuracy**: We use real J2000 ephemeris data (positions and velocities) for the starting state. The integrators (Verlet, RK4) are chosen for their energy-preservation properties.
+2. **Visual Literacy**: Real space is mostly empty. To make a "sim" that is actually usable, we apply a **Logarithmic-Linear Hybrid Scaling** to distances. This ensures that while Earth and its Moon are visible, you can still see Neptune without zooming out until the Sun is a single pixel.
+3. **Performance First**: N-Body simulations are $O(N^2)$. We utilize **Barnes-Hut** spatial partitioning and **SIMD** instructions to keep the frame rate smooth even with hundreds of asteroids.
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    A[Main Loop] --> B[Physics Engine]
+    A --> C[Graphics Engine]
+    A --> D[GUI Engine]
+    
+    subgraph "Physics"
+        B --> B1[Octree / Barnes-Hut]
+        B --> B2[Symplectic Integrators]
+        B --> B3[Collision Handler]
+    end
+    
+    subgraph "Graphics"
+        C --> C1[Sphere Renderer]
+        C --> C2[Shader Manager]
+        C --> C3[Texture Cache]
+    end
+    
+    subgraph "Data"
+        E[Ephemeris Loader] --> F[JSON/CSV Presets]
+        F --> A
+    end
+```
 
 ## Building
 
@@ -175,6 +209,11 @@ On Windows, CMake is configured to automatically copy required DLLs to the build
 
 ### White Spheres / Missing Textures
 Ensure the `textures/` folder is available in the working directory. The simulation expects `.jpg` or `.png` textures for each body.
+
+### Simulation "Explodes" / Bodies Fly Away
+This usually happens if the timestep ($dt$) is too large for a close encounter. 
+- **Fix**: Switch to **Adaptive Timestepping** in the GUI or reduce the time rate. 
+- **Physics Note**: Even with RK4, if two bodies are at the same coordinate, the force $1/r^2$ becomes infinite. Our "Softening" factor prevents $NaN$, but kinetic energy will still skyrocket.
 
 ## Contributing
 

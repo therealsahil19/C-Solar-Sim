@@ -13,9 +13,11 @@ namespace SolarSim {
 /**
  * @brief A node in the spatial partitioning Octree.
  * 
- * Each node represents a cubic volume in 3D space. If a node is a leaf, it may contain
- * a pointer to a Body. If it's an internal node, it contains a pre-calculated 
- * center of mass and total mass of all its descendants.
+ * Each node represents a cubic volume in 3D space. 
+ * - **Leaf Node**: Contains pointers to individual `Body` objects.
+ * - **Internal Node**: Contains aggregate data (Center of Mass, Total Mass) for all bodies within its volume.
+ * 
+ * @note This structure is optimized for the Barnes-Hut algorithm.
  */
 struct OctreeNode {
     Vector3 centerOfMass; ///< Weighted average position of all bodies in this node
@@ -49,10 +51,14 @@ struct OctreeNode {
  * To avoid the high cost of dynamic memory allocation and pointer chasing during 
  * high-frequency tree builds, this class uses a contiguous pool of OctreeNode objects.
  * 
- * Physics:
- * The implementation supports the Barnes-Hut algorithm, which approximates gravitational
+ * @perf
+ * - **Heap Stability**: No `new`/`delete` calls during simulation steps.
+ * - **Cache Locality**: Nodes are stored contiguously in memory, improving CPU cache hit rates.
+ * 
+ * @physics
+ * Supports the **Barnes-Hut algorithm**, which approximates gravitational
  * forces from distant clusters as a single force from their center of mass, 
- * reducing complexity from O(N^2) to O(N log N).
+ * reducing complexity from $O(N^2)$ to $O(N \log N)$.
  */
 class OctreePool {
 private:
@@ -113,6 +119,10 @@ public:
         double halfSize = pool[nodeIdx].size * 0.5;
         Vector3 mid = pool[nodeIdx].minBounds + Vector3(halfSize, halfSize, halfSize);
         
+        // Determine octant (0-7) using bit-masking
+        // Bit 0: X-axis (0: left, 1: right)
+        // Bit 1: Y-axis (0: bottom, 1: top)
+        // Bit 2: Z-axis (0: back, 1: front)
         int idx = 0;
         if (body->position.x >= mid.x) idx |= 1;
         if (body->position.y >= mid.y) idx |= 2;
