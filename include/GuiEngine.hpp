@@ -154,6 +154,77 @@ public:
     }
 
     /**
+     * @brief Render labels for celestial bodies.
+     */
+    static void renderLabels(const std::vector<Body>& bodies, const glm::mat4& viewProj,
+                            const sf::Vector2u& windowSize) {
+        SimulationState& state = getState();
+        if (!state.showLabels) return;
+
+        ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+
+        // Find Earth index for Moon positioning
+        int earthIndex = -1;
+        for (size_t i = 0; i < bodies.size(); ++i) {
+            if (bodies[i].name == "Earth") {
+                earthIndex = (int)i;
+                break;
+            }
+        }
+
+        for (const auto& body : bodies) {
+            if (body.name == "Asteroid") continue;
+
+            glm::vec3 worldPos;
+
+            if (body.name == "Moon" && earthIndex != -1) {
+                // Use shared logic from GraphicsEngine
+                worldPos = GraphicsEngine::calculateMoonVisualPosition(body, bodies[earthIndex]);
+            } else {
+                 // Duplicate logic from GraphicsEngine::getVisualScale
+                 // Ideally this should also be exposed by GraphicsEngine, but for now
+                 // we only fixed the complex Moon logic which was the main offender.
+                 float scale = 40.0f;
+                 if (body.name == "Sun") scale = 1.0f;
+                 else if (body.name == "Mercury") scale = 15.0f / 0.39f;
+                 else if (body.name == "Venus") scale = 30.0f / 0.72f;
+                 else if (body.name == "Earth") scale = 50.0f / 1.0f;
+                 else if (body.name == "Mars") scale = 75.0f / 1.52f;
+                 else if (body.name == "Jupiter") scale = 200.0f / 5.2f;
+                 else if (body.name == "Saturn") scale = 350.0f / 9.54f;
+                 else if (body.name == "Uranus") scale = 600.0f / 19.2f;
+                 else if (body.name == "Neptune") scale = 900.0f / 30.0f;
+                 else if (body.name == "Pluto") scale = 1100.0f / 39.5f;
+
+                 worldPos = glm::vec3(body.position.x, body.position.z, body.position.y) * scale;
+            }
+
+            // Project to screen space
+            glm::vec4 clipSpace = viewProj * glm::vec4(worldPos, 1.0f);
+
+            // Check if behind camera
+            if (clipSpace.w <= 0.0f) continue;
+
+            glm::vec3 ndc = glm::vec3(clipSpace) / clipSpace.w;
+
+            // Convert NDC to screen coordinates
+            float x = (ndc.x + 1.0f) * 0.5f * windowSize.x;
+            float y = (1.0f - ndc.y) * 0.5f * windowSize.y; // Flip Y
+
+            // Adjust label position (above the planet)
+            y -= 20.0f;
+
+            // Draw text with shadow for visibility
+            std::string label = body.name;
+            ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
+            ImVec2 textPos(x - textSize.x * 0.5f, y - textSize.y);
+
+            drawList->AddText(ImVec2(textPos.x + 1, textPos.y + 1), IM_COL32(0, 0, 0, 255), label.c_str());
+            drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), label.c_str());
+        }
+    }
+
+    /**
      * @brief Process SFML event for ImGui.
      */
     static void processEvent(const sf::Event& event) {
