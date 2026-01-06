@@ -29,7 +29,7 @@ class GraphicsEngine {
 private:
     sf::RenderWindow& window;
     Camera3D camera;
-    SphereRenderer sphereRenderer;
+    SphereRenderer sphereRenderer{64, 64};  // Higher resolution for smooth textures
     
     ShaderProgram planetShader;
     ShaderProgram sunShader;
@@ -55,6 +55,51 @@ private:
     
     bool initialized = false;
     std::string shaderPath;
+
+    // Visual scale multiplier - maps real AU to visual units
+    // Real distances: Mercury=0.39, Venus=0.72, Earth=1.0, Mars=1.52, Jupiter=5.2, Saturn=9.5, Uranus=19.2, Neptune=30
+    // Desired visual: Mercury=15, Venus=30, Earth=50, Mars=75, Jupiter=200, Saturn=350, Uranus=600, Neptune=900
+    static float getVisualScale(const std::string& name) {
+        // Scale factors derived from: visual_distance / real_distance
+        if (name == "Sun") return 1.0f;  // Origin
+        if (name == "Mercury") return 15.0f / 0.39f;   // ~38.5
+        if (name == "Venus") return 30.0f / 0.72f;     // ~41.7
+        if (name == "Earth") return 50.0f / 1.0f;      // 50
+        if (name == "Moon") return 50.0f / 1.0f;       // Same as Earth
+        if (name == "Mars") return 75.0f / 1.52f;      // ~49.3
+        if (name == "Asteroid") return 125.0f / 2.7f;  // ~46.3 (center of belt)
+        if (name == "Jupiter") return 200.0f / 5.2f;   // ~38.5
+        if (name == "Saturn") return 350.0f / 9.54f;   // ~36.7
+        if (name == "Uranus") return 600.0f / 19.2f;   // ~31.3
+        if (name == "Neptune") return 900.0f / 30.0f;  // 30
+        if (name == "Pluto") return 1100.0f / 39.5f;   // ~27.8
+        return 40.0f;  // Default scale
+    }
+
+    static glm::vec3 getVisualPosition(const Body& body) {
+        float scale = getVisualScale(body.name);
+        return glm::vec3(
+            (float)body.position.x * scale,
+            (float)body.position.z * scale,  // Y-up convention
+            (float)body.position.y * scale
+        );
+    }
+
+    static float getVisualRadius(const std::string& name) {
+        if (name == "Sun") return 5.0f;
+        if (name == "Mercury") return 0.8f;
+        if (name == "Venus") return 1.5f;
+        if (name == "Earth") return 1.6f;
+        if (name == "Moon") return 0.4f;
+        if (name == "Mars") return 1.0f;
+        if (name == "Jupiter") return 4.0f;
+        if (name == "Saturn") return 3.5f;
+        if (name == "Uranus") return 2.5f;
+        if (name == "Neptune") return 2.4f;
+        if (name == "Pluto") return 0.5f;
+        if (name == "Asteroid") return 0.3f;
+        return 1.0f;  // Default
+    }
 
     unsigned int loadTextureFromFile(const std::string& path) {
         sf::Image image;
@@ -185,7 +230,9 @@ public:
         // Sun position (always at origin for lighting)
         glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
         
-        // Coordinate axes removed from GUI
+        // Enable blending for trails and orbits (they need transparency)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Draw trails first (behind planets)
         if (showTrails) {
@@ -197,13 +244,17 @@ public:
             drawOrbits(bodies, view, projection);
         }
         
+        // Disable blending for opaque bodies (fixes depth buffer issue)
+        glDisable(GL_BLEND);
+        
         // Draw all bodies (except asteroids, which are instanced)
         asteroidMatrices.clear();
         for (const auto& body : bodies) {
             if (body.name == "Asteroid") {
-                float visualRadius = 0.02f;
+                float visualRadius = getVisualRadius("Asteroid");
                 glm::mat4 model = glm::mat4(1.0f);
-                model = glm::translate(model, glm::vec3((float)body.position.x, (float)body.position.z, (float)body.position.y));
+                glm::vec3 visualPos = getVisualPosition(body);
+                model = glm::translate(model, visualPos);
                 model = glm::scale(model, glm::vec3(visualRadius));
                 asteroidMatrices.push_back(model);
                 continue;
@@ -229,17 +280,13 @@ private:
         sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
         glm::vec3 color(sfColor.r / 255.0f, sfColor.g / 255.0f, sfColor.b / 255.0f);
         
-        // Calculate visual radius (scaled for visibility)
-        float visualRadius = (float)body.radius * 50.0f;  // Scale up for visibility
-        if (body.name == "Sun") visualRadius = 0.8f;
-        else if (body.name == "Asteroid") visualRadius = 0.02f;
-        else visualRadius = std::max(0.05f, std::min(visualRadius, 0.5f));
+        // Use visual radius from lookup
+        float visualRadius = getVisualRadius(body.name);
         
-        // Model matrix
+        // Model matrix with visual position scaling
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3((float)body.position.x, 
-                                                  (float)body.position.z,  // Y-up convention
-                                                  (float)body.position.y));
+        glm::vec3 visualPos = getVisualPosition(body);
+        model = glm::translate(model, visualPos);
         
         // Apply axial tilt
         if (body.axialTilt != 0) {
@@ -299,13 +346,14 @@ private:
             
             sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
             
-            // Build trail vertices with fading alpha
+            // Build trail vertices with fading alpha and visual scaling
+            float scale = getVisualScale(body.name);
             std::vector<float> vertices;
             for (size_t i = 0; i < body.trail.size(); ++i) {
                 float alpha = 0.4f * (float)i / (float)body.trail.size();
-                vertices.push_back((float)body.trail[i].x);
-                vertices.push_back((float)body.trail[i].z);  // Y-up
-                vertices.push_back((float)body.trail[i].y);
+                vertices.push_back((float)body.trail[i].x * scale);
+                vertices.push_back((float)body.trail[i].z * scale);  // Y-up
+                vertices.push_back((float)body.trail[i].y * scale);
                 vertices.push_back(sfColor.r / 255.0f);
                 vertices.push_back(sfColor.g / 255.0f);
                 vertices.push_back(sfColor.b / 255.0f);
@@ -395,12 +443,13 @@ private:
             // Get body color
             sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
             
-            // Build orbit vertices with semi-transparent color
+            // Build orbit vertices with semi-transparent color and visual scaling
+            float scale = getVisualScale(body.name);
             std::vector<float> vertices;
             for (const auto& pt : orbitPoints) {
-                vertices.push_back((float)pt.x);
-                vertices.push_back((float)pt.z);  // Y-up convention
-                vertices.push_back((float)pt.y);
+                vertices.push_back((float)pt.x * scale);
+                vertices.push_back((float)pt.z * scale);  // Y-up convention
+                vertices.push_back((float)pt.y * scale);
                 vertices.push_back(sfColor.r / 255.0f);
                 vertices.push_back(sfColor.g / 255.0f);
                 vertices.push_back(sfColor.b / 255.0f);

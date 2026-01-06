@@ -123,6 +123,17 @@ public:
 
     bool isFocused() const { return mode == CameraMode::Follow; }
 
+    // Reset camera to default position/orientation
+    void resetToDefault() {
+        focusPoint = glm::vec3(0.0f, 0.0f, 0.0f);
+        orbitDistance = 80.0f;
+        minOrbitDistance = 1.0f;
+        yaw = -90.0f;
+        pitch = 30.0f;
+        mode = CameraMode::Orbit;
+        updateCameraVectors();
+    }
+
     // Expose controls for GUI
     float* getDistancePtr() { return &orbitDistance; }
     float* getYawPtr() { return &yaw; }
@@ -130,9 +141,12 @@ public:
     float* getFovPtr() { return &fov; }
 
     void handleEvent(const sf::Event& event) {
-        // Mouse wheel zoom (all modes)
+        // Mouse wheel zoom (all modes) - distance-proportional for smooth control
         if (event.type == sf::Event::MouseWheelScrolled) {
-            orbitDistance -= event.mouseWheelScroll.delta * zoomSpeed;
+            // Zoom speed scales with distance: slow when close, faster when far
+            float adaptiveZoom = orbitDistance * 0.1f;  // 10% of current distance per scroll
+            adaptiveZoom = std::max(0.5f, std::min(adaptiveZoom, 10.0f));  // Clamp to reasonable range
+            orbitDistance -= event.mouseWheelScroll.delta * adaptiveZoom;
             orbitDistance = std::max(minOrbitDistance, std::min(orbitDistance, 500.0f));
             updateCameraVectors();
         }
