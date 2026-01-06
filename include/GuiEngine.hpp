@@ -44,9 +44,10 @@ public:
         float timeRate = 1.0f;      ///< Multiplier for delta time (1.0 = Real-time approx)
         int integrator = 2;         ///< Chosen integration method (0=Verlet, 1=RK4, 2=Barnes-Hut)
         bool showTrails = true;     ///< Toggle for orbital path visualization
-        bool showLabels = false;    ///< Toggle for body name tags
+        bool showLabels = true;     ///< Toggle for body name tags
         bool showAsteroids = true;  ///< Toggle for orbital belt rendering
-        bool showOrbits = true;     ///< Toggle for geometric orbit prediction lines
+        bool showPlanetOrbits = true;///< Toggle for main 8 planets
+        bool showOtherOrbits = false;///< Toggle for other bodies (Pluto, Moons, etc)
         float elapsedYears = 0.0f;  ///< Relative simulation time in years
         int fps = 0;                ///< Monitored frames per second
         
@@ -72,7 +73,6 @@ public:
         std::vector<Toast> toasts;      ///< Active notification queue
         
         // Theme & Visual Settings
-        bool darkMode = true;           ///< Dark/Light theme state
         bool isLoading = false;         ///< Is a long-running process (like preset loading) active?
         float loadingProgress = 0.0f;   ///< Progress percentage [0..1]
         
@@ -97,28 +97,17 @@ public:
     /**
      * @brief Apply theme colors based on dark/light mode.
      */
-    static void applyTheme(bool darkMode) {
+    static void applyTheme() {
         ImGuiStyle& style = ImGui::GetStyle();
         
-        if (darkMode) {
-            style.Colors[ImGuiCol_WindowBg] = Theme::Surface;
-            style.Colors[ImGuiCol_TitleBg] = Theme::TitleBg;
-            style.Colors[ImGuiCol_TitleBgActive] = Theme::TitleBgActive;
-            style.Colors[ImGuiCol_FrameBg] = Theme::FrameBg;
-            style.Colors[ImGuiCol_Button] = Theme::Primary;
-            style.Colors[ImGuiCol_ButtonHovered] = Theme::PrimaryHover;
-            style.Colors[ImGuiCol_ButtonActive] = Theme::PrimaryActive;
-            style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        } else {
-            style.Colors[ImGuiCol_WindowBg] = Theme::Light::Surface;
-            style.Colors[ImGuiCol_TitleBg] = Theme::Light::TitleBg;
-            style.Colors[ImGuiCol_TitleBgActive] = Theme::Light::TitleBgActive;
-            style.Colors[ImGuiCol_FrameBg] = Theme::Light::FrameBg;
-            style.Colors[ImGuiCol_Button] = Theme::Light::Primary;
-            style.Colors[ImGuiCol_ButtonHovered] = Theme::Light::PrimaryHover;
-            style.Colors[ImGuiCol_ButtonActive] = Theme::Light::PrimaryActive;
-            style.Colors[ImGuiCol_Text] = Theme::Light::Text;
-        }
+        style.Colors[ImGuiCol_WindowBg] = Theme::Surface;
+        style.Colors[ImGuiCol_TitleBg] = Theme::TitleBg;
+        style.Colors[ImGuiCol_TitleBgActive] = Theme::TitleBgActive;
+        style.Colors[ImGuiCol_FrameBg] = Theme::FrameBg;
+        style.Colors[ImGuiCol_Button] = Theme::Primary;
+        style.Colors[ImGuiCol_ButtonHovered] = Theme::PrimaryHover;
+        style.Colors[ImGuiCol_ButtonActive] = Theme::PrimaryActive;
+        style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
         
         // Common colors
         style.Colors[ImGuiCol_SliderGrab] = Theme::SliderGrab;
@@ -150,7 +139,7 @@ public:
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         
         // Apply initial dark theme
-        applyTheme(true);
+        applyTheme();
     }
 
     /**
@@ -303,28 +292,21 @@ public:
         if (!state.showVisibility) return;
         
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 panelSize(260, 200);
+        ImVec2 panelSize(260, 240);
         ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 10);
         
         ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
         
         ImGui::Begin("Visibility", &state.showVisibility,
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-        
-        // Theme toggle in header
-        ImGui::SameLine(ImGui::GetWindowWidth() - 45);
-        if (ImGui::Button(state.darkMode ? "#" : "O", ImVec2(28, 0))) {
-            state.darkMode = !state.darkMode;
-            applyTheme(state.darkMode);
-            addToast(state.darkMode ? "Dark Mode" : "Light Mode", ToastType::Info);
-        }
-        ImGui::SetItemTooltip("Toggle Dark/Light Theme");
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
         
         ImGui::Spacing();
         ImGui::Checkbox("Orbital Trails (T)", &state.showTrails);
-        ImGui::Checkbox("Orbit Ellipses", &state.showOrbits);
-        ImGui::Checkbox("Body Labels", &state.showLabels);
+        ImGui::Checkbox("Orbital Labels", &state.showLabels);
+        ImGui::Checkbox("Planet Orbits", &state.showPlanetOrbits);
+        ImGui::Checkbox("Other Orbits", &state.showOtherOrbits);
         ImGui::Checkbox("Asteroids", &state.showAsteroids);
 
         ImGui::End();
@@ -337,15 +319,16 @@ public:
         if (!state.showBodyInfo) return;
         
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 panelSize(260, 420);
-        // Position below visibility panel with gap
-        ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 220);
+        ImVec2 panelSize(260, 360);
+        // Position below visibility panel with gap (10 + 240 + 10)
+        ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 260);
         
         ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
         
         ImGui::Begin("Body Information", &state.showBodyInfo,
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
         
         // A11y: Keyboard navigation hints
         ImGui::TextDisabled("Use Up/Down arrows to navigate");
@@ -406,32 +389,34 @@ public:
             ImGui::Text("Mass: %.6e M", b.mass);
             ImGui::Text("Radius: %.6e AU", b.radius);
             
-            ImGui::Separator();
-            ImGui::Text("Position (AU):");
-            ImGui::Text("  X: %.4f", b.position.x);
-            ImGui::Text("  Y: %.4f", b.position.y);
-            ImGui::Text("  Z: %.4f", b.position.z);
-            
-            double dist = b.position.length();
-            ImGui::Text("Distance: %.4f AU", dist);
-            
-            ImGui::Separator();
-            ImGui::Text("Velocity (AU/y):");
-            ImGui::Text("  X: %.4f", b.velocity.x);
-            ImGui::Text("  Y: %.4f", b.velocity.y);
-            ImGui::Text("  Z: %.4f", b.velocity.z);
-            
-            double speed = b.velocity.length();
-            ImGui::Text("Speed: %.4f AU/y", speed);
-            
-            if (dist > 0.01) {
-                double T = std::sqrt(dist * dist * dist);
-                ImGui::Text("Orbital Period: %.2f y", T);
+            if (ImGui::CollapsingHeader("Extra")) {
+                ImGui::Separator();
+                ImGui::Text("Position (AU):");
+                ImGui::Text("  X: %.4f", b.position.x);
+                ImGui::Text("  Y: %.4f", b.position.y);
+                ImGui::Text("  Z: %.4f", b.position.z);
+                
+                double dist = b.position.length();
+                ImGui::Text("Distance: %.4f AU", dist);
+                
+                ImGui::Separator();
+                ImGui::Text("Velocity (AU/y):");
+                ImGui::Text("  X: %.4f", b.velocity.x);
+                ImGui::Text("  Y: %.4f", b.velocity.y);
+                ImGui::Text("  Z: %.4f", b.velocity.z);
+                
+                double speed = b.velocity.length();
+                ImGui::Text("Speed: %.4f AU/y", speed);
+                
+                if (dist > 0.01) {
+                    double T = std::sqrt(dist * dist * dist);
+                    ImGui::Text("Orbital Period: %.2f y", T);
+                }
+                
+                ImGui::Separator();
+                ImGui::Text("Rotation: %.1f deg", b.rotationAngle);
+                ImGui::Text("Tilt: %.1f deg", b.axialTilt);
             }
-            
-            ImGui::Separator();
-            ImGui::Text("Rotation: %.1f deg", b.rotationAngle);
-            ImGui::Text("Tilt: %.1f deg", b.axialTilt);
         } else {
             ImGui::TextWrapped("Select a body from the dropdown to view its properties.");
         }

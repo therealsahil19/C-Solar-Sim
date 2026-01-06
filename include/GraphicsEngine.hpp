@@ -235,7 +235,7 @@ public:
         camera.handleEvent(event);
     }
 
-    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showOrbits = true) {
+    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false) {
         if (!initialized) {
             if (!init()) return;
         }
@@ -266,8 +266,8 @@ public:
         }
         
         // Draw orbit ellipses
-        if (showOrbits) {
-            drawOrbits(bodies, view, projection);
+        if (showPlanetOrbits || showOtherOrbits) {
+            drawOrbits(bodies, view, projection, showPlanetOrbits, showOtherOrbits);
         }
         
         // Disable blending for opaque bodies (fixes depth buffer issue)
@@ -460,7 +460,7 @@ private:
         glBindVertexArray(0);
     }
 
-    void drawOrbits(const std::vector<Body>& bodies, const glm::mat4& view, const glm::mat4& projection) {
+    void drawOrbits(const std::vector<Body>& bodies, const glm::mat4& view, const glm::mat4& projection, bool showPlanets, bool showOthers) {
         trailShader.use();
         trailShader.setMat4("view", view);
         trailShader.setMat4("projection", projection);
@@ -476,8 +476,26 @@ private:
         double mu = Constants::G * sunMass;
         
         for (const auto& body : bodies) {
-            // Skip the Sun, asteroids, and Moon (Moon orbits Earth, not Sun)
-            if (body.name == "Sun" || body.name == "Asteroid" || body.name == "Moon") continue;
+            // Skip the Sun and asteroids
+            if (body.name == "Sun" || body.name == "Asteroid") continue;
+
+            // Determine if it's a planet
+            bool isPlanet = (body.name == "Mercury" || body.name == "Venus" || body.name == "Earth" ||
+                            body.name == "Mars" || body.name == "Jupiter" || body.name == "Saturn" ||
+                            body.name == "Uranus" || body.name == "Neptune");
+
+            // Filter based on toggles
+            if (isPlanet && !showPlanets) continue;
+            if (!isPlanet && !showOthers) continue;
+            
+            // Special handling for Moon (orbits Earth, not Sun)
+            if (body.name == "Moon") {
+                // For now, Moon orbit is included in "others" if toggle is on
+                // but we might need Earth's mass for mu if we want it correct.
+                // Re-calculating elements for Moon around Sun result in chaotic lines
+                // or very large ellipses. Let's skip Moon for now or just treat as other.
+                continue; 
+            }
             
             // Calculate orbital elements
             OrbitalElements orbit = OrbitCalculator::calculateElements(body.position, body.velocity, mu);
