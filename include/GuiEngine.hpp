@@ -52,6 +52,9 @@ public:
         
         // Body selection
         int selectedBody = 0;           ///< Index of the currently focused body
+        int lastSelectedBody = -1;      ///< Track previous selection for change detection
+        bool cameraFocused = false;     ///< Is camera following a planet?
+        bool requestCameraUnfocus = false; ///< Signal to unfocus camera
         int presetRequest = -1;         ///< ID of preset to load (-1 if none)
         bool requestSave = false;       ///< Signal to trigger state export
         bool requestLoad = false;       ///< Signal to trigger state import
@@ -289,6 +292,16 @@ public:
                 }
             }
             ImGui::EndCombo();
+        }
+        
+        // Unfocus button - only show when focused on a planet (not Sun)
+        if (state.cameraFocused && state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
+            && bodies[state.selectedBody].name != "Sun") {
+            ImGui::SameLine();
+            if (ImGui::Button("Unfocus")) {
+                state.requestCameraUnfocus = true;
+            }
+            ImGui::SetItemTooltip("Stop following planet, camera becomes free");
         }
         
         // A11y: Keyboard body navigation

@@ -4,6 +4,7 @@
 #include "glad.h"
 
 #include <SFML/Graphics.hpp>
+#include <glm/glm.hpp>
 #include "GraphicsEngine.hpp"
 #include "PhysicsEngine.hpp"
 #include "EphemerisLoader.hpp"
@@ -152,6 +153,52 @@ int main() {
         }
 
         auto& guiState = SolarSim::GuiEngine::getState();
+
+        // Handle camera focus based on planet selection
+        if (guiState.selectedBody != guiState.lastSelectedBody) {
+            guiState.lastSelectedBody = guiState.selectedBody;
+            
+            if (guiState.selectedBody >= 0 && guiState.selectedBody < (int)system.size()) {
+                const auto& body = system[guiState.selectedBody];
+                
+                if (body.name == "Sun") {
+                    // Sun selected: camera behaves as free (Orbit mode focused on origin)
+                    graphics.getCamera().setMode(SolarSim::CameraMode::Orbit);
+                    graphics.getCamera().setFocusPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+                    graphics.getCamera().setMinDistance(1.0f);  // Reset to default zoom limit
+                    guiState.cameraFocused = false;
+                } else {
+                    // Planet selected: camera follows the planet
+                    glm::vec3 pos((float)body.position.x, (float)body.position.z, (float)body.position.y);
+                    graphics.getCamera().setFocusPoint(pos);
+                    graphics.getCamera().setMode(SolarSim::CameraMode::Follow);
+                    guiState.cameraFocused = true;
+                    
+                    // Calculate min zoom distance based on body radius (visual radius * safety factor)
+                    float visualRadius = (float)body.radius * 50.0f;
+                    visualRadius = std::max(0.05f, std::min(visualRadius, 0.5f));
+                    float minZoom = visualRadius * 2.5f;  // 2.5x the visual radius as safe distance
+                    graphics.getCamera().setMinDistance(minZoom);
+                }
+            }
+        }
+        
+        // Handle unfocus request
+        if (guiState.requestCameraUnfocus) {
+            graphics.getCamera().setMode(SolarSim::CameraMode::Orbit);
+            guiState.cameraFocused = false;
+            guiState.requestCameraUnfocus = false;
+            SolarSim::GuiEngine::addToast("Camera unfocused", SolarSim::GuiEngine::ToastType::Info);
+        }
+        
+        // Update camera focus point each frame if focused on a planet (not Sun)
+        if (guiState.cameraFocused && guiState.selectedBody >= 0 && guiState.selectedBody < (int)system.size()) {
+            const auto& body = system[guiState.selectedBody];
+            if (body.name != "Sun") {
+                glm::vec3 pos((float)body.position.x, (float)body.position.z, (float)body.position.y);
+                graphics.getCamera().setFocusPoint(pos);
+            }
+        }
 
         // Handle preset requests (NEW)
         if (guiState.presetRequest >= 0) {

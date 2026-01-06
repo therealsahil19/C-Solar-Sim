@@ -33,6 +33,7 @@ private:
     // Orbit mode parameters
     glm::vec3 focusPoint;
     float orbitDistance;
+    float minOrbitDistance;  // Minimum zoom distance (prevents clipping into planets)
     float yaw;
     float pitch;
 
@@ -75,6 +76,7 @@ public:
         , worldUp(0.0f, 1.0f, 0.0f)
         , focusPoint(0.0f, 0.0f, 0.0f)
         , orbitDistance(80.0f)
+        , minOrbitDistance(1.0f)  // Default minimum
         , yaw(-90.0f)
         , pitch(30.0f)
         , fov(45.0f)
@@ -108,6 +110,19 @@ public:
         }
     }
 
+    void setMinDistance(float minDist) {
+        minOrbitDistance = minDist;
+        // Clamp current distance if needed
+        if (orbitDistance < minOrbitDistance) {
+            orbitDistance = minOrbitDistance;
+            updateCameraVectors();
+        }
+    }
+
+    float getMinDistance() const { return minOrbitDistance; }
+
+    bool isFocused() const { return mode == CameraMode::Follow; }
+
     // Expose controls for GUI
     float* getDistancePtr() { return &orbitDistance; }
     float* getYawPtr() { return &yaw; }
@@ -118,7 +133,7 @@ public:
         // Mouse wheel zoom (all modes)
         if (event.type == sf::Event::MouseWheelScrolled) {
             orbitDistance -= event.mouseWheelScroll.delta * zoomSpeed;
-            orbitDistance = std::max(1.0f, std::min(orbitDistance, 500.0f));
+            orbitDistance = std::max(minOrbitDistance, std::min(orbitDistance, 500.0f));
             updateCameraVectors();
         }
 
