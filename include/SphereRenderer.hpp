@@ -60,7 +60,9 @@ public:
 
                 // UV coordinates
                 float u = 1.0f - (float)lon / (float)longitudeSegments;
-                float v = 1.0f - (float)lat / (float)latitudeSegments;
+                // Fix inverted texture: OpenGL 0,0 is bottom-left, but SFML loads images top-down.
+                // We flip V so that lat=0 (North Pole) maps to V=0 (Row 0 of image data).
+                float v = (float)lat / (float)latitudeSegments;
 
                 // Add vertex: position (3) + normal (3) + texcoord (2)
                 vertices.push_back(x);
