@@ -269,10 +269,30 @@ public:
         }
         ImGui::SetItemTooltip("Reset elapsed time to zero");
 
+        static const float allowedRates[] = { 0.0f, 0.1f, 0.5f, 1.0f, 2.0f, 4.0f, 10.0f, 25.0f, 50.0f, 150.0f };
+        static const int numRates = sizeof(allowedRates) / sizeof(allowedRates[0]);
+
+        // Find closest index for the current timeRate (handles external changes like mission mode)
+        int currentIndex = 0;
+        float minDiff = std::abs(state.timeRate - allowedRates[0]);
+        for (int i = 1; i < numRates; ++i) {
+            float diff = std::abs(state.timeRate - allowedRates[i]);
+            if (diff < minDiff) {
+                minDiff = diff;
+                currentIndex = i;
+            }
+        }
+
         ImGui::Spacing();
         ImGui::SetNextItemWidth(-1);
-        ImGui::SliderFloat("##TimeRate", &state.timeRate, 0.1f, 100.0f, "Time Rate: %.1fx");
-        ImGui::SetItemTooltip("Adjust the speed of time (1.0 = Realtime approx)");
+        
+        char formatBuf[32];
+        sprintf_s(formatBuf, "Time Rate: %.1fx", allowedRates[currentIndex]);
+        
+        if (ImGui::SliderInt("##TimeRate", &currentIndex, 0, numRates - 1, formatBuf)) {
+            state.timeRate = allowedRates[currentIndex];
+        }
+        ImGui::SetItemTooltip("Adjust the speed of time (Discrete: 0x to 150x)");
 
         ImGui::Spacing();
         ImGui::Text("Elapsed: %.2f years", state.elapsedYears);
