@@ -72,13 +72,9 @@ private:
         // This prevents the viewport from rotating as the user orbits, making
         // planet textures appear stable from the user's perspective.
         
-        // Handle gimbal lock: when looking straight up/down, front is parallel to worldUp
-        float dotVal = std::abs(glm::dot(front, worldUp));
+        // Since pitch is constrained to +/- 89 degrees, front is never parallel to worldUp.
+        // We can safely use worldUp without fallback logic that causes discontinuities.
         glm::vec3 baseUp = worldUp;
-        if (dotVal > 0.99f) {
-            // Near gimbal lock, use a fallback perpendicular to front
-            baseUp = glm::vec3(0.0f, 0.0f, -1.0f);
-        }
         
         // Compute right and up from baseUp (Gram-Schmidt orthogonalization)
         glm::vec3 initialRight = glm::normalize(glm::cross(front, baseUp));
