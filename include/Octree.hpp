@@ -108,8 +108,11 @@ public:
                 Body* existingBody = pool[nodeIdx].bodies[0];
                 pool[nodeIdx].isLeaf = false;
                 pool[nodeIdx].numBodies = 0;
+                // Re-insert existing body into a child, then insert the new body
+                // The parent's totalMass and centerOfMass are already set for the existingBody (from lines 105-106)
+                // The subsequent insert() call will handle merging the new body's mass.
                 insertIntoChild(nodeIdx, existingBody);
-                insertIntoChild(nodeIdx, body);
+                insert(nodeIdx, body); 
             }
         } else {
             insertIntoChild(nodeIdx, body);
@@ -168,10 +171,8 @@ public:
      * @param totalForce Output accumulator for the force vector
      */
     void calculateForceIterative(int rootIdx, Body* body, double theta, Vector3& totalForce) const {
-        // Softening parameter: prevents singularity when distance approaches zero.
-        // Value 1e-4 AU^2 chosen to be small enough not to affect macro-scale physics
-        // but large enough to prevent numerical instability in close encounters.
-        constexpr double SOFTENING_SQUARED = 1e-4;
+        // Use the global softening parameter to maintain consistency
+        const double SOFTENING_SQUARED = Constants::SOFTENING_EPSILON;
 
         traversalStack.clear();
         traversalStack.push_back(rootIdx);

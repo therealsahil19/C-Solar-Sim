@@ -20,6 +20,11 @@ A professional-grade 3D solar system simulation built in C++ with OpenGL, featur
 - **Orbital Trails**: Fading trails showing orbital paths
 - **3D Camera**: Orbit, free-fly, and follow modes
 
+### Mathematical Foundations
+- **Gravity**: Newton's Law of Universal Gravitation ($F = G \frac{m_1 m_2}{r^2}$) with constant $G = 4\pi^2$.
+- **Integration**: Symplectic Velocity Verlet for conservation of Energy and Momentum.
+- **Scaling**: Hybrid Log-Linear "Scaling Bridge" to maintain visual literacy in the void of space.
+
 ### Data & Accuracy
 - **J2000 Ephemeris**: Real NASA/JPL Keplerian orbital elements
 - **Keplerian Solver**: Newton-Raphson iteration for Kepler's equation

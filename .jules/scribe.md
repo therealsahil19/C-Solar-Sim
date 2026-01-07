@@ -32,3 +32,8 @@ Documentation standards and coverage logs.
 **Focus:** Physics, Graphics Bridge, and Memory Pooling.
 **Standard:** Doxygen with LaTeX formulas for physics; "Scaling Bridge" definition for graphics.
 **Gap:** GUI Engine transition animations and input handling details are still sparse.
+
+## 2026-01-07 - [Docs Update] **Scribe: Core Literacy & Mathematical Foundations** ✍️
+**Focus:** Unit systems, Integrator math (RK4/Verlet), and Scaling Bridge philosophy.
+**Standard:** Detailed "Why over What" documentation in headers. Added Math section to README.
+**Gap:** Shader internals (GLSL) and texture mapping logic could use more detail.

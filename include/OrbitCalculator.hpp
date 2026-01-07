@@ -33,6 +33,15 @@ public:
     /**
      * @brief Converts state vectors (position, velocity) to Keplerian orbital elements.
      * 
+     * @details
+     * The conversion follows standard astrodynamics algorithms:
+     * 1. **Specific Orbital Energy** ($\epsilon = v^2/2 - \mu/r$): Used to find semi-major axis $a$.
+     * 2. **Specific Angular Momentum** ($h = r \times v$): Defines the orbital plane orientation.
+     * 3. **Eccentricity Vector** ($e = \frac{v \times h}{\mu} - \frac{r}{|r|}$): Points toward periapsis.
+     * 4. **Inclination** ($i = \arccos(h_z / |h|)$): Angle relative to the XY plane.
+     * 5. **Longitude of Ascending Node** ($\Omega$): Angle from X-axis to where the orbit crosses XY plane.
+     * 6. **Argument of Periapsis** ($\omega$): Angle from node vector to periapsis.
+     * 
      * @param pos Position vector relative to central body (AU)
      * @param vel Velocity vector (AU/year)
      * @param mu Gravitational parameter (G * M_central), default uses Sun's mass

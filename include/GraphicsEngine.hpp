@@ -61,15 +61,18 @@ public:
      * @brief Visual scale multiplier - maps real AU to visual units.
      * 
      * @philosophy
-     * **The Scaling Bridge**: Space is mostly empty. If we rendered everything to 
-     * scale, the Sun would be a sub-pixel speck and the planets would be light-years 
-     * apart on screen. To create a navigable experience, we use a **Hybrid Log-Linear 
-     * Scaling**:
+     * **The Scaling Bridge**: Space is mostly empty (99.999% vacuum). If we rendered 
+     * the system to scale, the Sun would be a sub-pixel speck and planets would be 
+     * invisible. To create a "Visual Literacy" of the system, we use a **Hybrid 
+     * Log-Linear Scaling**:
      * 
-     * 1. **Sun**: Over-scaled by ~100x to be the center-piece.
-     * 2. **Inner Planets**: Linear scaling relative to each other.
-     * 3. **Outer Giants**: Logarithmic scaling to keep the system compact enough to view.
-     * 4. **Moon**: Special relative scaling to keep it visible near Earth.
+     * 1. **Linear Scaling (Inner)**: Mercury to Mars use linear offsets to preserve 
+     *    the feeling of the rocky inner system.
+     * 2. **Logarithmic Compression (Outer)**: Distant giants (Jupiter to Eris) are 
+     *    pulled inward using a log-based mapping, allowing the user to see the entire 
+     *    family of planets in one view without Neptune being 30x further than Earth.
+     * 3. **Size Magnification**: Planetary radii are magnified by ~1000x relative 
+     *    to orbital distances so they appear as discs rather than points.
      * 
      * @param name Name of the celestial body
      * @returns The visual scale factor
@@ -317,13 +320,17 @@ public:
         glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
         
         // ============= PASS 1: OPAQUE OBJECTS (Planets) =============
-        // To ensure correct occlusion, we draw solid spheres first.
-        // - Depth testing: ON
-        // - Depth writing: ON
-        // - Alpha blending: OFF
+        /**
+         * @details
+         * Solid spheres are rendered first with full depth writing. This provides 
+         * the "occlusion skeleton" for the scene.
+         * - **Depth Testing**: Enabled (GL_LESS)
+         * - **Depth Writing**: Enabled (GL_TRUE)
+         * - **Blending**: Disabled
+         */
         glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_TRUE);  // Enable depth writing
-        glDisable(GL_BLEND);   // Opaque, no blending
+        glDepthMask(GL_TRUE); 
+        glDisable(GL_BLEND); 
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         
@@ -367,16 +374,19 @@ public:
         }
         
         // ============= PASS 2: TRANSPARENT OBJECTS (Trails/Orbits) =============
-        // Transparent objects must be drawn LAST. They sample the depth buffer
-        // to see if they are behind a planet, but do NOT write their own depth,
-        // preventing them from occluding objects behind them.
-        // - Depth testing: ON
-        // - Depth writing: OFF
-        // - Alpha blending: ON
-        glDepthMask(GL_FALSE);  // Disable depth writing for transparent objects
+        /**
+         * @details
+         * Semi-transparent trails and orbit lines must be drawn AFTER opaque objects. 
+         * They sample the depth buffer (to hide behind planets) but DO NOT write 
+         * to it (to avoid occluding each other).
+         * - **Depth Testing**: Enabled
+         * - **Depth Writing**: Disabled (GL_FALSE)
+         * - **Blending**: Enabled (Alpha Blending)
+         */
+        glDepthMask(GL_FALSE);  
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_CULL_FACE);  // Lines don't need culling
+        glDisable(GL_CULL_FACE); 
         
         // Draw trails
         if (showTrails) {

@@ -33,8 +33,18 @@ public:
     static constexpr double TOLERANCE = 1e-12;
 
     /**
-     * @brief Solves Kepler's equation: M = E - e*sin(E) for eccentric anomaly E.
-     * Uses Newton-Raphson iteration.
+     * @brief Solves Kepler's equation: $M = E - e \sin(E)$ for eccentric anomaly $E$.
+     * 
+     * @details
+     * Since the equation is transcendental, we use the **Newton-Raphson** method to 
+     * find the root of $f(E) = E - e \sin(E) - M$:
+     * 
+     * $$E_{n+1} = E_n - \frac{f(E_n)}{f'(E_n)} = E_n - \frac{E - e \sin(E) - M}{1 - e \cos(E)}$$
+     * 
+     * **Initial Guess**:
+     * - For $e < 0.8$, we use $E = M$.
+     * - For high eccentricity, we use $E = \pi$ to avoid convergence issues near periapsis.
+     * 
      * @param M Mean anomaly (radians)
      * @param e Eccentricity
      * @return Eccentric anomaly E (radians)

@@ -41,10 +41,12 @@ public:
      * @brief Calculates accelerations for all bodies with optimized cache access.
      * 
      * Optimization notes:
-     * - Extracts position components to local variables to reduce struct access
-     * - Accumulates accelerations locally before writing back
-     * - Computes invDist once and derives invDist3 from it (faster than 1/sqrt^3)
-     * - Moons only interact gravitationally with their parent planet
+     * - **Cache Locality**: Extracts position components to local variables to minimize pointer 
+     *   chasing and struct-of-arrays overhead.
+     * - **Local Accumulation**: Accumulates accelerations in registers (axi/ayi/azi) before 
+     *   writing back to memory to reduce bus contention.
+     * - **InvDist Optimization**: Computes `invDist` once and derives `invDist3` (faster than 
+     *   `pow(d, -1.5)`).
      * 
      * @note This is an O(N^2) implementation. For large N, use Barnes-Hut.
      */
@@ -66,13 +68,8 @@ public:
             for (size_t j = i + 1; j < n; ++j) {
                 Body& bj = bodies[j];
                 
-                // Skip interaction if either body is a moon and the other is not its parent
-                // Moons only interact with their parent planet
-                bool iIsMoon = !bi.parentName.empty();
-                bool jIsMoon = !bj.parentName.empty();
-                
-                if (iIsMoon && bj.name != bi.parentName) continue;
-                if (jIsMoon && bi.name != bj.parentName) continue;
+                // No longer skipping moon interactions - every body should interact with every other body
+                // for correct orbital physics (e.g. Earth's Moon must still be attracted to the Sun)
                 
                 const double mj = bj.mass;
                 
@@ -211,6 +208,9 @@ public:
      * - $k_4 = f(t + dt, y + k_3 dt)$
      * - $y(t+dt) = y(t) + \frac{dt}{6}(k_1 + 2k_2 + 2k_3 + k_4)$
      * 
+     * @note While highly accurate, RK4 is NOT symplectic and may exhibit energy 
+     * drift over very long timescales (millennia).
+     * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years
      */
@@ -224,11 +224,7 @@ public:
         auto getA = [&](const std::vector<Vector3>& pos, std::vector<Vector3>& acc) {
             for(auto& ac : acc) ac = Vector3(0,0,0);
             for(size_t i=0; i<n; ++i) for(size_t j=i+1; j<n; ++j) {
-                // Skip interaction if moon and other body is not its parent
-                bool iIsMoon = !bodies[i].parentName.empty();
-                bool jIsMoon = !bodies[j].parentName.empty();
-                if (iIsMoon && bodies[j].name != bodies[i].parentName) continue;
-                if (jIsMoon && bodies[i].name != bodies[j].parentName) continue;
+                // Every body should interact with every other body (including moons and the Sun)
                 
                 Vector3 r = pos[j] - pos[i];
                 double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
@@ -295,23 +291,11 @@ public:
         for (auto& b : bodies) b.updatePosition(dt);
         handleCollisions(bodies);
         for (auto& b : bodies) { 
-            if (!b.parentName.empty()) {
-                // Moon: only interact with parent planet (not Barnes-Hut)
-                for (const auto& parent : bodies) {
-                    if (parent.name == b.parentName) {
-                        Vector3 r = parent.position - b.position;
-                        double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
-                        double invDist3 = 1.0 / (distSq * std::sqrt(distSq));
-                        b.acceleration = r * (Constants::G * parent.mass * invDist3);
-                        break;
-                    }
-                }
-            } else {
-                // Regular body: use Barnes-Hut approximation
-                Vector3 f(0,0,0); 
-                pool.calculateForceIterative(rootIdx, &b, theta, f); 
-                b.acceleration = f / b.mass; 
-            }
+            // Regular body: use Barnes-Hut approximation
+            // Moons are now included in the same Barnes-Hut hierarchy as planets
+            Vector3 f(0,0,0); 
+            pool.calculateForceIterative(rootIdx, &b, theta, f); 
+            b.acceleration = f / b.mass; 
         }
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
 
