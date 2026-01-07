@@ -118,6 +118,10 @@ public:
     }
 
     // Helper for shared Moon positioning logic
+    static glm::vec3 calculateMoonVisualPosition(const Body& moon, const Body& earth) {
+        return calculateMoonVisualPosition(moon.position, earth.position, getVisualPosition(earth.position, earth.name));
+    }
+
     static glm::vec3 calculateMoonVisualPosition(const Vector3& moonPos, const Vector3& earthPos, const glm::vec3& earthVisualPos) {
         glm::vec3 earthRealPos(earthPos.x, earthPos.z, earthPos.y);
         glm::vec3 moonRealPos(moonPos.x, moonPos.z, moonPos.y);

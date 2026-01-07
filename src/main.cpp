@@ -226,7 +226,7 @@ int main(int argc, char* argv[]) {
                     graphics.getCamera().update();
                     
                     char filename[64];
-                    sprintf(filename, "jupiter_%d.png", angleIndex + 1);
+                    sprintf_s(filename, "jupiter_%d.png", angleIndex + 1);
                     captureScreen(window, filename);
                     
                     missionStep++;
@@ -250,7 +250,7 @@ int main(int argc, char* argv[]) {
                 graphics.getCamera().update();
                 
                 char filename[64];
-                sprintf(filename, "frames/jupiter_%03d.png", videoFramesCaptured);
+                sprintf_s(filename, "frames/jupiter_%03d.png", videoFramesCaptured);
                 captureScreen(window, filename);
                 
                 videoFramesCaptured++;
