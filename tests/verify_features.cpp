@@ -8,6 +8,7 @@
 #include "Validator.hpp"
 #include "StateManager.hpp"
 #include "SystemData.hpp"
+#include "EphemerisLoader.hpp"
 
 using namespace SolarSim;
 
@@ -393,6 +394,68 @@ void test_csv_malformed_handling() {
 }
 
 // =============================================================================
+// NEW: Moon Orbital Stability Test
+// =============================================================================
+
+void test_moon_orbital_stability() {
+    std::cout << "[TEST] Moon Orbital Stability (Barnes-Hut)..." << std::endl;
+    
+    auto bodies = EphemerisLoader::loadSolarSystemJ2000();
+    convertToBarycentric(bodies);
+    
+    // Find initial moon-parent distances
+    std::vector<std::pair<std::string, double>> moonDistances;
+    for (const auto& moon : bodies) {
+        if (moon.parentName.empty()) continue;
+        
+        for (const auto& parent : bodies) {
+            if (parent.name == moon.parentName) {
+                double dist = (moon.position - parent.position).length();
+                moonDistances.push_back({moon.name, dist});
+                std::cout << "  " << moon.name << " initial distance from " 
+                          << moon.parentName << ": " << dist << " AU" << std::endl;
+                break;
+            }
+        }
+    }
+    
+    // Simulate for ~10 days (short timeframe to verify stability)
+    double dt = 0.001;  // ~0.36 days
+    for (int i = 0; i < 30; ++i) {
+        PhysicsEngine::stepBarnesHut(bodies, dt, 0.5);
+    }
+    
+    // Check final distances
+    bool allStable = true;
+    for (const auto& [moonName, initialDist] : moonDistances) {
+        for (const auto& moon : bodies) {
+            if (moon.name != moonName) continue;
+            
+            for (const auto& parent : bodies) {
+                if (parent.name == moon.parentName) {
+                    double finalDist = (moon.position - parent.position).length();
+                    double ratio = finalDist / initialDist;
+                    
+                    std::cout << "  " << moonName << " final distance: " << finalDist 
+                              << " AU (ratio: " << ratio << ")" << std::endl;
+                    
+                    // Moon should stay within 5x of initial distance
+                    if (ratio > 5.0) {
+                        std::cout << "  WARNING: " << moonName << " drifted too far!" << std::endl;
+                        allStable = false;
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    
+    assert(allStable && "Some moons drifted too far from their parent planets");
+    std::cout << "[PASS] Moon Orbital Stability" << std::endl << std::endl;
+}
+
+// =============================================================================
 // Main Entry Point
 // =============================================================================
 
@@ -416,6 +479,9 @@ int main() {
         test_rk4_with_changing_body_count();
         test_rotation_wrap_negative();
         test_csv_malformed_handling();
+        
+        // Moon orbital stability test
+        test_moon_orbital_stability();
         
         std::cout << "=====================================" << std::endl;
         std::cout << "✅ ALL TESTS PASSED SUCCESSFULLY" << std::endl;

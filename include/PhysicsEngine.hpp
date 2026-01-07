@@ -44,6 +44,7 @@ public:
      * - Extracts position components to local variables to reduce struct access
      * - Accumulates accelerations locally before writing back
      * - Computes invDist once and derives invDist3 from it (faster than 1/sqrt^3)
+     * - Moons only interact gravitationally with their parent planet
      * 
      * @note This is an O(N^2) implementation. For large N, use Barnes-Hut.
      */
@@ -64,6 +65,15 @@ public:
             
             for (size_t j = i + 1; j < n; ++j) {
                 Body& bj = bodies[j];
+                
+                // Skip interaction if either body is a moon and the other is not its parent
+                // Moons only interact with their parent planet
+                bool iIsMoon = !bi.parentName.empty();
+                bool jIsMoon = !bj.parentName.empty();
+                
+                if (iIsMoon && bj.name != bi.parentName) continue;
+                if (jIsMoon && bi.name != bj.parentName) continue;
+                
                 const double mj = bj.mass;
                 
                 // Compute delta components
@@ -214,6 +224,12 @@ public:
         auto getA = [&](const std::vector<Vector3>& pos, std::vector<Vector3>& acc) {
             for(auto& ac : acc) ac = Vector3(0,0,0);
             for(size_t i=0; i<n; ++i) for(size_t j=i+1; j<n; ++j) {
+                // Skip interaction if moon and other body is not its parent
+                bool iIsMoon = !bodies[i].parentName.empty();
+                bool jIsMoon = !bodies[j].parentName.empty();
+                if (iIsMoon && bodies[j].name != bodies[i].parentName) continue;
+                if (jIsMoon && bodies[i].name != bodies[j].parentName) continue;
+                
                 Vector3 r = pos[j] - pos[i];
                 double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
                 double invDist3 = 1.0 / (distSq * std::sqrt(distSq));
@@ -222,6 +238,7 @@ public:
                 acc[i] += force_scaled * m[j]; acc[j] -= force_scaled * m[i];
             }
         };
+
 
         std::vector<Vector3> k1_v(n), k1_a(n), k2_v(n), k2_a(n), k3_v(n), k3_a(n), k4_v(n), k4_a(n);
 
@@ -278,11 +295,26 @@ public:
         for (auto& b : bodies) b.updatePosition(dt);
         handleCollisions(bodies);
         for (auto& b : bodies) { 
-            Vector3 f(0,0,0); 
-            pool.calculateForceIterative(rootIdx, &b, theta, f); 
-            b.acceleration = f / b.mass; 
+            if (!b.parentName.empty()) {
+                // Moon: only interact with parent planet (not Barnes-Hut)
+                for (const auto& parent : bodies) {
+                    if (parent.name == b.parentName) {
+                        Vector3 r = parent.position - b.position;
+                        double distSq = r.lengthSquared() + Constants::SOFTENING_EPSILON;
+                        double invDist3 = 1.0 / (distSq * std::sqrt(distSq));
+                        b.acceleration = r * (Constants::G * parent.mass * invDist3);
+                        break;
+                    }
+                }
+            } else {
+                // Regular body: use Barnes-Hut approximation
+                Vector3 f(0,0,0); 
+                pool.calculateForceIterative(rootIdx, &b, theta, f); 
+                b.acceleration = f / b.mass; 
+            }
         }
         for (auto& b : bodies) b.velocity += b.acceleration * (dt * 0.5);
+
     }
 
     /**

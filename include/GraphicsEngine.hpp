@@ -77,18 +77,22 @@ public:
     static float getVisualScale(const std::string& name) {
         // Scale factors derived from: visual_distance / real_distance
         if (name == "Sun") return 1.0f;  // Origin
-        if (name == "Mercury") return 15.0f / 0.39f;   // ~38.5
-        if (name == "Venus") return 30.0f / 0.72f;     // ~41.7
-        if (name == "Earth") return 50.0f / 1.0f;      // 50
-        if (name == "Moon") return 1.0f;               // Special handling relative to Earth
-        if (name == "Mars") return 75.0f / 1.52f;      // ~49.3
-        if (name == "Asteroid") return 125.0f / 2.7f;  // ~46.3 (center of belt)
-        if (name == "Jupiter") return 200.0f / 5.2f;   // ~38.5
-        if (name == "Saturn") return 350.0f / 9.54f;   // ~36.7
-        if (name == "Uranus") return 600.0f / 19.2f;   // ~31.3
-        if (name == "Neptune") return 900.0f / 30.0f;  // 30
-        if (name == "Pluto") return 1100.0f / 39.5f;   // ~27.8
-        return 40.0f;  // Default scale
+        if (name == "Mercury") return 30.0f / 0.39f;    // ~76.9
+        if (name == "Venus") return 75.0f / 0.72f;      // ~104.2
+        if (name == "Earth") return 130.0f / 1.0f;      // 130
+        if (name == "Moon") return 1.0f;                // Special handling relative to Earth
+        if (name == "Mars") return 200.0f / 1.52f;      // ~131.6
+        if (name == "Asteroid") return 280.0f / 2.7f;   // ~103.7 (center of belt 240-320)
+        if (name == "Ceres") return 280.0f / 2.77f;     // ~101.1 (in asteroid belt at 2.77 AU)
+        if (name == "Jupiter") return 600.0f / 5.2f;    // ~115.4
+        if (name == "Saturn") return 950.0f / 9.54f;    // ~99.6
+        if (name == "Uranus") return 1350.0f / 19.2f;   // ~70.3
+        if (name == "Neptune") return 1900.0f / 30.0f;  // ~63.3
+        if (name == "Pluto") return 2500.0f / 39.5f;    // ~63.3 (just beyond Neptune)
+        if (name == "Haumea") return 2700.0f / 43.1f;   // ~62.6 (at 43 AU)
+        if (name == "Makemake") return 2900.0f / 45.8f; // ~63.3 (at 45.8 AU)
+        if (name == "Eris") return 4300.0f / 67.7f;     // ~63.5 (most distant at 68 AU)
+        return 63.0f;  // Default scale for other celestial bodies
     }
 
     static glm::vec3 getVisualPosition(const Vector3& pos, const std::string& name) {
@@ -105,7 +109,7 @@ public:
         if (name == "Mercury") return 0.8f;
         if (name == "Venus") return 1.5f;
         if (name == "Earth") return 1.6f;
-        if (name == "Moon") return 0.4f;
+        if (name == "Moon") return 0.4f;  // ~25% of Earth
         if (name == "Mars") return 1.0f;
         if (name == "Jupiter") return 4.0f;
         if (name == "Saturn") return 3.5f;
@@ -113,25 +117,62 @@ public:
         if (name == "Neptune") return 2.4f;
         if (name == "Pluto") return 0.5f;
         if (name == "Asteroid") return 0.3f;
-        return 1.0f;  // Default
+        // Jupiter's moons (relative to Jupiter's visual radius of 4.0)
+        if (name == "Io") return 0.5f;        // 2.6% of Jupiter -> 0.1, but make visible
+        if (name == "Europa") return 0.45f;   // 2.2% of Jupiter
+        if (name == "Ganymede") return 0.6f;  // 3.7% of Jupiter, largest moon
+        if (name == "Callisto") return 0.55f; // 3.4% of Jupiter
+        // Saturn's moon
+        if (name == "Titan") return 0.6f;     // 4.4% of Saturn, larger than Mercury
+        // Neptune's moon
+        if (name == "Triton") return 0.4f;    // 5.5% of Neptune
+        return 0.5f;  // Default for moons
     }
 
-    // Helper for shared Moon positioning logic
+    /**
+     * @brief Returns the parent planet name for a given moon.
+     */
+    static std::string getParentPlanet(const std::string& moonName) {
+        if (moonName == "Moon") return "Earth";
+        if (moonName == "Io" || moonName == "Europa" || 
+            moonName == "Ganymede" || moonName == "Callisto") return "Jupiter";
+        if (moonName == "Titan") return "Saturn";
+        if (moonName == "Triton") return "Neptune";
+        return "";  // Not a moon
+    }
+
+    /**
+     * @brief Calculates visual position for any satellite relative to its parent planet.
+     */
+    static glm::vec3 calculateSatelliteVisualPosition(const Body& satellite, const Body& parent) {
+        glm::vec3 parentVisualPos = getVisualPosition(parent.position, parent.name);
+        
+        // Get real positions in Y-up convention
+        glm::vec3 parentRealPos(parent.position.x, parent.position.z, parent.position.y);
+        glm::vec3 satRealPos(satellite.position.x, satellite.position.z, satellite.position.y);
+        
+        glm::vec3 relativePos = satRealPos - parentRealPos;
+        
+        // Scale factor to make moons visible around their parent
+        // Different scales based on parent planet size and moon orbital distance
+        float relativeScale = 1500.0f;  // Default for Earth's Moon
+        
+        if (satellite.name == "Io" || satellite.name == "Europa" || 
+            satellite.name == "Ganymede" || satellite.name == "Callisto") {
+            // Jupiter's moons are further out, use larger scale
+            relativeScale = 800.0f;
+        } else if (satellite.name == "Titan") {
+            relativeScale = 600.0f;
+        } else if (satellite.name == "Triton") {
+            relativeScale = 1000.0f;
+        }
+        
+        return parentVisualPos + (relativePos * relativeScale);
+    }
+
+    // Legacy helper for backward compatibility
     static glm::vec3 calculateMoonVisualPosition(const Body& moon, const Body& earth) {
-        return calculateMoonVisualPosition(moon.position, earth.position, getVisualPosition(earth.position, earth.name));
-    }
-
-    static glm::vec3 calculateMoonVisualPosition(const Vector3& moonPos, const Vector3& earthPos, const glm::vec3& earthVisualPos) {
-        glm::vec3 earthRealPos(earthPos.x, earthPos.z, earthPos.y);
-        glm::vec3 moonRealPos(moonPos.x, moonPos.z, moonPos.y);
-
-        glm::vec3 relativePos = moonRealPos - earthRealPos;
-        // Scale the distance significantly so it's visible outside Earth
-        // Real distance ~0.00257 AU. Earth Visual Radius = 1.6.
-        // We need distance > 2.0. Scale factor ~1500x relative.
-        float relativeScale = 2000.0f;
-
-        return earthVisualPos + (relativePos * relativeScale);
+        return calculateSatelliteVisualPosition(moon, earth);
     }
     
 
@@ -286,12 +327,12 @@ public:
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         
-        // Find Earth index for Moon positioning
-        int earthIndex = -1;
+        // Find parent planet indices for moon positioning
+        std::map<std::string, int> parentIndices;
         for (size_t i = 0; i < bodies.size(); ++i) {
-            if (bodies[i].name == "Earth") {
-                earthIndex = (int)i;
-                break;
+            const std::string& name = bodies[i].name;
+            if (name == "Earth" || name == "Jupiter" || name == "Saturn" || name == "Neptune") {
+                parentIndices[name] = (int)i;
             }
         }
 
@@ -308,9 +349,11 @@ public:
                 continue;
             }
 
-            // Special handling for Moon
-            if (body.name == "Moon" && earthIndex != -1) {
-                glm::vec3 visualPos = calculateMoonVisualPosition(body, bodies[earthIndex]);
+            // Check if this is a moon that needs satellite positioning
+            std::string parentName = getParentPlanet(body.name);
+            if (!parentName.empty() && parentIndices.count(parentName)) {
+                int parentIdx = parentIndices[parentName];
+                glm::vec3 visualPos = calculateSatelliteVisualPosition(body, bodies[parentIdx]);
                 drawBodyInternal(body.name, visualPos, body.axialTilt, (float)body.rotationAngle, view, projection, camPos, lightPos);
                 continue;
             }
@@ -446,6 +489,11 @@ private:
         
         for (const auto& body : bodies) {
             if (body.trail.size() < 2 || body.name == "Asteroid") continue;
+            
+            // Skip trails for moons - they're drawn at physics coordinates which don't match
+            // the visual satellite positions (moons are scaled relative to their parent planets)
+            if (!getParentPlanet(body.name).empty()) continue;
+
             
             sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
             

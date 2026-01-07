@@ -169,15 +169,17 @@ int main(int argc, char* argv[]) {
 
         // Helper to get visual position matching graphics rendering
         auto getVisualPos = [&system](const SolarSim::Body& body) -> glm::vec3 {
-            if (body.name == "Moon") {
+            std::string parentName = SolarSim::GraphicsEngine::getParentPlanet(body.name);
+            if (!parentName.empty()) {
                 for (const auto& b : system) {
-                    if (b.name == "Earth") {
-                        return SolarSim::GraphicsEngine::calculateMoonVisualPosition(body, b);
+                    if (b.name == parentName) {
+                        return SolarSim::GraphicsEngine::calculateSatelliteVisualPosition(body, b);
                     }
                 }
             }
             return SolarSim::GraphicsEngine::getVisualPosition(body.position, body.name);
         };
+
 
         auto getVisualRad = [](const std::string& name) -> float {
             return SolarSim::GraphicsEngine::getVisualRadius(name);

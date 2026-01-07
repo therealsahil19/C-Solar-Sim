@@ -117,7 +117,7 @@ public:
         , roll(0.0f)  // Start with no roll
         , fov(45.0f)
         , nearPlane(0.5f)
-        , farPlane(15000.0f)
+        ,farPlane(25000.0f)
         , moveSpeed(5.0f)
         , zoomSpeed(5.0f)
         , rotateSpeed(0.2f)
@@ -188,7 +188,7 @@ public:
             float adaptiveZoom = orbitDistance * 0.1f;  // 10% of current distance per scroll
             adaptiveZoom = std::max(0.5f, std::min(adaptiveZoom, 1000.0f));  // Clamp to reasonable range
             orbitDistance -= event.mouseWheelScroll.delta * adaptiveZoom;
-            orbitDistance = std::max(minOrbitDistance, std::min(orbitDistance, 10000.0f));
+            orbitDistance = std::max(minOrbitDistance, std::min(orbitDistance, 20000.0f));
             updateCameraVectors();
         }
 

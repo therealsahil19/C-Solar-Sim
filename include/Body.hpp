@@ -25,12 +25,15 @@ public:
     double rotationAngle; // in degrees
     double rotationSpeed; // degrees per year
     double axialTilt;     // in degrees
+    
+    // Parent body name (for moons orbiting planets)
+    std::string parentName;  // Empty for planets/Sun, set for moons
 
     Body(const std::string& name, double mass, double radius, 
          Vector3 pos = Vector3(), Vector3 vel = Vector3())
         : name(name), mass(mass), radius(radius), 
           position(pos), velocity(vel), acceleration(0, 0, 0),
-          rotationAngle(0), rotationSpeed(0), axialTilt(0) {}
+          rotationAngle(0), rotationSpeed(0), axialTilt(0), parentName("") {}
 
     /**
      * @brief Resets current acceleration to zero. 

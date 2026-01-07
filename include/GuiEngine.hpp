@@ -8,13 +8,13 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <map>
 #include "Body.hpp"
 #include "PhysicsEngine.hpp"
 #include "StateManager.hpp"
 #include "Theme.hpp"
+#include "GraphicsEngine.hpp"
 
-// Forward declare GraphicsEngine to avoid circular dependency
-namespace SolarSim { class GraphicsEngine; }
 
 namespace SolarSim {
 
@@ -150,12 +150,12 @@ public:
 
         ImDrawList* drawList = ImGui::GetBackgroundDrawList();
 
-        // Find Earth index for Moon positioning
-        int earthIndex = -1;
+        // Build parent planet index lookup for satellite positioning
+        std::map<std::string, int> parentIndices;
         for (size_t i = 0; i < bodies.size(); ++i) {
-            if (bodies[i].name == "Earth") {
-                earthIndex = (int)i;
-                break;
+            const std::string& name = bodies[i].name;
+            if (name == "Earth" || name == "Jupiter" || name == "Saturn" || name == "Neptune") {
+                parentIndices[name] = (int)i;
             }
         }
 
@@ -164,12 +164,17 @@ public:
 
             glm::vec3 worldPos;
 
-            if (body.name == "Moon" && earthIndex != -1) {
-                // Use shared logic from GraphicsEngine
-                worldPos = GraphicsEngine::calculateMoonVisualPosition(body, bodies[earthIndex]);
+            // Check if this is a moon - use same logic as GraphicsEngine::render
+            std::string parentName = GraphicsEngine::getParentPlanet(body.name);
+            if (!parentName.empty() && parentIndices.count(parentName)) {
+                // Moon: position relative to parent planet
+                int parentIdx = parentIndices[parentName];
+                worldPos = GraphicsEngine::calculateSatelliteVisualPosition(body, bodies[parentIdx]);
             } else {
-                 worldPos = GraphicsEngine::getVisualPosition(body.position, body.name);
+                // Planet or other body: use standard visual position
+                worldPos = GraphicsEngine::getVisualPosition(body.position, body.name);
             }
+
 
             // Project to screen space
             glm::vec4 clipSpace = viewProj * glm::vec4(worldPos, 1.0f);

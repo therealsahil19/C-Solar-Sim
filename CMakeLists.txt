@@ -54,6 +54,10 @@ add_executable(verify
     tests/verify_features.cpp
 )
 
+add_executable(check_moons
+    tests/check_moons.cpp
+)
+
 # GLM is header-only - include directories
 target_include_directories(SolarSim PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
@@ -67,6 +71,12 @@ target_include_directories(verify PRIVATE
     include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
 )
+
+target_include_directories(check_moons PRIVATE 
+    include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/glm
+)
+
 
 # Link all libraries
 target_link_libraries(SolarSim
