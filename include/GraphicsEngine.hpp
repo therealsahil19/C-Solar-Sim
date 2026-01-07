@@ -626,6 +626,7 @@ public:
     ~GraphicsEngine() {
         if (trailVAO) glDeleteVertexArrays(1, &trailVAO);
         if (trailVBO) glDeleteBuffers(1, &trailVBO);
+        if (asteroidInstanceVBO) glDeleteBuffers(1, &asteroidInstanceVBO);
         if (orbitVAO) glDeleteVertexArrays(1, &orbitVAO);
         if (orbitVBO) glDeleteBuffers(1, &orbitVBO);
         for (auto& [name, tex] : glTextures) {

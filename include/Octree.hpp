@@ -168,6 +168,11 @@ public:
      * @param totalForce Output accumulator for the force vector
      */
     void calculateForceIterative(int rootIdx, Body* body, double theta, Vector3& totalForce) const {
+        // Softening parameter: prevents singularity when distance approaches zero.
+        // Value 1e-4 AU^2 chosen to be small enough not to affect macro-scale physics
+        // but large enough to prevent numerical instability in close encounters.
+        constexpr double SOFTENING_SQUARED = 1e-4;
+
         traversalStack.clear();
         traversalStack.push_back(rootIdx);
 
@@ -179,21 +184,22 @@ public:
             if (node.isLeaf) {
                 if (node.numBodies > 0 && node.bodies[0] != body) {
                     Vector3 r = node.bodies[0]->position - body->position;
-                    double d2 = r.lengthSquared() + 1e-4;
+                    double d2 = r.lengthSquared() + SOFTENING_SQUARED;
                     double invD3 = 1.0 / (d2 * std::sqrt(d2));
                     totalForce += r * (Constants::G * body->mass * node.bodies[0]->mass * invD3);
                 }
             } else {
                 double dist = (node.centerOfMass - body->position).length();
-                if (node.size / dist < theta) {
-                    Vector3 r = node.centerOfMass - body->position;
-                    double d2 = r.lengthSquared() + 1e-4;
-                    double invD3 = 1.0 / (d2 * std::sqrt(d2));
-                    totalForce += r * (Constants::G * body->mass * node.totalMass * invD3);
-                } else {
+                // Guard against division-by-zero: if body is at center of mass, traverse children
+                if (dist < 1e-10 || node.size / dist >= theta) {
                     for (int i = 0; i < 8; ++i) {
                         if (node.children[i] != -1) traversalStack.push_back(node.children[i]);
                     }
+                } else {
+                    Vector3 r = node.centerOfMass - body->position;
+                    double d2 = r.lengthSquared() + SOFTENING_SQUARED;
+                    double invD3 = 1.0 / (d2 * std::sqrt(d2));
+                    totalForce += r * (Constants::G * body->mass * node.totalMass * invD3);
                 }
             }
         }
