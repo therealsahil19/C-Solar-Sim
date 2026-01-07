@@ -19,7 +19,6 @@
 #include "SphereRenderer.hpp"
 #include "Theme.hpp"
 #include "OrbitCalculator.hpp"
-#include "HistoryManager.hpp"
 
 namespace SolarSim {
 
@@ -255,8 +254,7 @@ public:
         camera.handleEvent(event);
     }
 
-    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false, 
-                const Snapshot* ghostSnapshot = nullptr, float ghostOpacity = 0.4f) {
+    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false) {
         if (!initialized) {
             if (!init()) return;
         }
@@ -347,30 +345,6 @@ public:
             drawOrbits(bodies, view, projection, showPlanetOrbits, showOtherOrbits);
         }
         
-        // ============= PASS 3: GHOST OVERLAY =============
-        if (ghostSnapshot && ghostSnapshot->bodyStates.size() == bodies.size()) {
-            for (size_t i = 0; i < bodies.size(); ++i) {
-                const auto& body = bodies[i];
-                if (body.name == "Asteroid") continue;
-
-                const auto& ghostState = ghostSnapshot->bodyStates[i];
-                glm::vec3 visualPos;
-
-                if (body.name == "Moon" && earthIndex != -1) {
-                    const auto& currentEarth = bodies[earthIndex];
-                    const auto& ghostEarth = ghostSnapshot->bodyStates[earthIndex];
-                    // Moon is relative to Earth. For the ghost, we use the recorded Earth-Moon relationship
-                    // but scaled to current visual Earth position? 
-                    // No, for a true drift visualization, we should probably ghost the whole system relative to origin.
-                    glm::vec3 ghostEarthVisualPos = getVisualPosition(ghostEarth.position, "Earth");
-                    visualPos = calculateMoonVisualPosition(ghostState.position, ghostEarth.position, ghostEarthVisualPos);
-                } else {
-                    visualPos = getVisualPosition(ghostState.position, body.name);
-                }
-
-                drawBodyInternal(body.name, visualPos, body.axialTilt, (float)ghostState.rotationAngle, view, projection, camPos, lightPos, ghostOpacity);
-            }
-        }
         
         // Restore depth mask for next frame
         glDepthMask(GL_TRUE);
@@ -404,8 +378,7 @@ private:
     void drawBodyInternal(const std::string& name, const glm::vec3& visualPos,
                           double axialTilt, float rotationAngle,
                           const glm::mat4& view, const glm::mat4& projection,
-                          const glm::vec3& camPos, const glm::vec3& lightPos,
-                          float opacity = 1.0f) {
+                          const glm::vec3& camPos, const glm::vec3& lightPos) {
         
         // Get color
         sf::Color sfColor = bodyColors.count(name) ? bodyColors.at(name) : sf::Color::White;
@@ -442,7 +415,6 @@ private:
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         shader.setVec3("objectColor", color);
-        shader.setFloat("opacity", opacity);
         
         // Check for texture
         bool hasTexture = glTextures.count(name) > 0;

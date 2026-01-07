@@ -11,7 +11,7 @@
 #include "SystemData.hpp"
 #include "GuiEngine.hpp"
 #include "StateManager.hpp"
-#include "HistoryManager.hpp"
+#include "StateManager.hpp"
 
 #include <filesystem>
 
@@ -124,8 +124,6 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    SolarSim::HistoryManager history;
-    bool wasTimeTravelActive = false;
 
     while (window.isOpen()) {
         // Event handling
@@ -299,37 +297,9 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Time-Travel Logic
-        if (guiState.timeTravelActive) {
-            // Scrubbing through history - restore state
-            history.getStateAt(guiState.scrubTime, system);
-            
-            // Handle requests to resume from current position
-            if (!guiState.timeTravelActive) {
-                // User clicked "Resume" - truncate future history
-                history.truncateAfter(guiState.scrubTime);
-            }
-        }
-        
-        // Handle epoch marking
-        if (guiState.requestMarkEpoch) {
-            history.markEpoch(guiState.epochName, guiState.elapsedYears, system);
-            guiState.requestMarkEpoch = false;
-        }
-        
-        // Handle epoch jumping
-        if (!guiState.requestEpochJump.empty()) {
-            const auto& epochs = history.getEpochs();
-            auto it = epochs.find(guiState.requestEpochJump);
-            if (it != epochs.end()) {
-                history.getStateAt(it->second.time, system);
-                guiState.scrubTime = (float)it->second.time;
-            }
-            guiState.requestEpochJump = "";
-        }
 
-        // Physics (skip if time-traveling)
-        if (!guiState.paused && !guiState.timeTravelActive) {
+        // Physics
+        if (!guiState.paused) {
             double frameTime = baseDt * guiState.timeRate;
             double currentT = 0;
             while (currentT < frameTime) {
@@ -343,36 +313,11 @@ int main(int argc, char* argv[]) {
                 currentT += adt;
             }
             guiState.elapsedYears += (float)frameTime;
-            history.record(guiState.elapsedYears, system);
         }
 
-        // Rendering
-        const SolarSim::Snapshot* ghostSnapshot = nullptr;
-        static SolarSim::Snapshot scrubGhost;
-        static bool hasScrubGhost = false;
-
-        if (guiState.showGhost) {
-            if (guiState.selectedGhostEpoch.empty()) {
-                // Ghost follows the current scrubbed state if active
-                if (guiState.timeTravelActive) {
-                    scrubGhost.time = (double)guiState.scrubTime;
-                    scrubGhost.bodyStates.clear();
-                    for (const auto& b : system) {
-                        scrubGhost.bodyStates.push_back({b.position, b.velocity, b.rotationAngle});
-                    }
-                    hasScrubGhost = true;
-                }
-                if (hasScrubGhost) ghostSnapshot = &scrubGhost;
-            } else {
-                const auto& epochs = history.getEpochs();
-                auto it = epochs.find(guiState.selectedGhostEpoch);
-                if (it != epochs.end()) ghostSnapshot = &it->second;
-            }
-        }
-
-        graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits, ghostSnapshot, guiState.ghostOpacity);
+        graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits);
         SolarSim::GuiEngine::renderLabels(system, graphics.getViewProjectionMatrix(), window.getSize());
-        SolarSim::GuiEngine::render(system, history, scalePtr, rotXPtr, rotZPtr);
+        SolarSim::GuiEngine::render(system, scalePtr, rotXPtr, rotZPtr);
         SolarSim::GuiEngine::display(window);
         window.display();
     }

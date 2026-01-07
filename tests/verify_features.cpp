@@ -7,7 +7,7 @@
 #include "Validator.hpp"
 #include "StateManager.hpp"
 #include "SystemData.hpp"
-#include "HistoryManager.hpp"
+#include "SystemData.hpp"
 
 using namespace SolarSim;
 
@@ -92,66 +92,6 @@ void test_presets() {
     std::cout << "[PASS] Preset Integrity" << std::endl << std::endl;
 }
 
-// =============================================================================
-// NEW: HistoryManager Time-Travel Tests
-// =============================================================================
-
-void test_history_manager() {
-    std::cout << "[TEST] History Manager (Time-Travel)..." << std::endl;
-    
-    HistoryManager history(100);  // Small buffer for testing
-    auto bodies = StateManager::loadPreset(PresetType::BinaryStarTest);
-    assert(bodies.size() == 2);
-    
-    // Record initial state
-    double simTime = 0.0;
-    history.record(simTime, bodies);
-    Vector3 initialPos = bodies[0].position;
-    
-    // Run simulation and record snapshots
-    double dt = 0.01;
-    for (int i = 0; i < 50; ++i) {
-        PhysicsEngine::stepVerlet(bodies, dt);
-        simTime += dt;
-        history.record(simTime, bodies);
-    }
-    
-    Vector3 finalPos = bodies[0].position;
-    assert(history.getHistorySize() > 40);  // Should have recorded many snapshots
-    std::cout << "  Recorded " << history.getHistorySize() << " snapshots" << std::endl;
-    
-    // Test time-travel: restore to beginning
-    bool restored = history.getStateAt(0.0, bodies);
-    assert(restored);
-    double posError = (bodies[0].position - initialPos).length();
-    std::cout << "  Restored to t=0, position error: " << posError << std::endl;
-    assert(posError < 1e-9);  // Should be exactly at initial
-    
-    // Test time-travel: restore to middle (interpolated)
-    restored = history.getStateAt(0.25, bodies);
-    assert(restored);
-    std::cout << "  Restored to t=0.25 (interpolated)" << std::endl;
-    
-    // Test epoch marking
-    bodies = StateManager::loadPreset(PresetType::BinaryStarTest);
-    history.markEpoch("Start", 0.0, bodies);
-    history.markEpoch("Mid", 0.5, bodies);
-    assert(history.getEpochs().size() == 2);
-    std::cout << "  Marked 2 epochs" << std::endl;
-    
-    // Test truncateAfter
-    history.truncateAfter(0.2);
-    assert(history.getEndTime() <= 0.2);
-    std::cout << "  Truncated history to t<=0.2" << std::endl;
-    
-    // Test clear
-    history.clear();
-    assert(history.getHistorySize() == 0);
-    assert(history.getEpochs().empty());
-    std::cout << "  Cleared history and epochs" << std::endl;
-    
-    std::cout << "[PASS] History Manager" << std::endl << std::endl;
-}
 
 // =============================================================================
 // NEW: Verlet Integrator Energy Conservation
@@ -353,8 +293,7 @@ int main() {
         test_state_persistence();
         test_presets();
         
-        // NEW tests
-        test_history_manager();
+        // original tests
         test_integrator_verlet();
         test_integrator_barnes_hut();
         test_collision_detection();
