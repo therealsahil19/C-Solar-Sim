@@ -1,5 +1,24 @@
 # PRUNER'S JOURNAL - PRUNING LOG
 
+## 2026-01-07 - [Dead Code Cleanup Session 2]
+**Scope:** `GraphicsEngine.hpp`, `GuiEngine.hpp`
+**Removed:**
+- `GraphicsEngine::drawAxes` (29 lines) - Unused debug axis renderer
+- `GuiEngine::renderStats` (8 lines) - Legacy console output fallback
+
+**Impact:**
+- Reduced technical debt by removing unused debug/legacy code.
+- Lines removed: 37
+- Build time Δ: Negligible.
+- Bundle size Δ: Negligible.
+
+**Notes:**
+- Comprehensive codebase scan found only 2 unused functions.
+- No orphaned files, unused dependencies, or dead imports detected.
+- All 13 E2E tests pass after removal.
+
+---
+
 ## 2026-01-07 - [Dead Code Cleanup] 
 **Scope:** `GraphicsEngine.hpp`, `main.cpp`
 **Removed:** 

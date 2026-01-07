@@ -589,37 +589,6 @@ private:
             glDrawArrays(GL_LINE_LOOP, 0, (GLsizei)orbitPoints.size());
         }
     }
-
-    void drawAxes(const glm::mat4& view, const glm::mat4& projection) {
-        trailShader.use();
-        trailShader.setMat4("view", view);
-        trailShader.setMat4("projection", projection);
-        
-        // Axis lines: X (red), Y (green), Z (blue) - 10 AU each direction
-        float axisVertices[] = {
-            // X axis (red)
-            -10.0f, 0.0f, 0.0f, 0.4f, 0.0f, 0.0f, 0.5f,
-             10.0f, 0.0f, 0.0f, 0.4f, 0.0f, 0.0f, 0.5f,
-            // Y axis (green) 
-            0.0f, -10.0f, 0.0f, 0.0f, 0.4f, 0.0f, 0.5f,
-            0.0f,  10.0f, 0.0f, 0.0f, 0.4f, 0.0f, 0.5f,
-            // Z axis (blue)
-            0.0f, 0.0f, -10.0f, 0.0f, 0.0f, 0.4f, 0.5f,
-            0.0f, 0.0f,  10.0f, 0.0f, 0.0f, 0.4f, 0.5f,
-        };
-        
-        glBindVertexArray(trailVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(axisVertices), axisVertices, GL_DYNAMIC_DRAW);
-        
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-        
-        glDrawArrays(GL_LINES, 0, 6);
-    }
-
 public:
     ~GraphicsEngine() {
         if (trailVAO) glDeleteVertexArrays(1, &trailVAO);

@@ -561,15 +561,6 @@ public:
     static void shutdown() {
         ImGui::SFML::Shutdown();
     }
-
-    /**
-     * @brief Console stats output (fallback / legacy).
-     */
-    static void renderStats(const std::vector<Body>& bodies, double dt) {
-        (void)bodies;
-        (void)dt;
-        // Legacy console output - now handled by ImGui
-    }
 };
 
 } // namespace SolarSim
