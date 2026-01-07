@@ -28,7 +28,7 @@ Documentation standards and coverage logs.
 **Standard:** GFM README, Doxygen Headers (Math-heavy).
 **Gap:** Octree and Shader internals could use deeper logic flow documentation.
 
-## 2026-01-06 - [Docs Overhaul] **Scribe: Literacy Overhaul** ✍️
-**Focus:** Explaining the "Why" and mathematical depth.
-**Standard:** Enhanced Doxygen for physics (RK4, Barnes-Hut) and Graphics (Scaling Bridge).
-**Gap:** Shader variable mapping and texture coordinate generation could use more inline comments.
+## 2026-01-07 - [Docs Update] **Scribe: Technical Literacy Overhaul** ✍️
+**Focus:** Physics, Graphics Bridge, and Memory Pooling.
+**Standard:** Doxygen with LaTeX formulas for physics; "Scaling Bridge" definition for graphics.
+**Gap:** GUI Engine transition animations and input handling details are still sparse.

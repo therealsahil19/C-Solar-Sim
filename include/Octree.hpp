@@ -34,6 +34,11 @@ struct OctreeNode {
         for (int i = 0; i < 8; ++i) children[i] = -1;
     }
 
+    /**
+     * @brief Resets the node state for reuse in the memory pool.
+     * @param minB The minimum corner coordinates of the cubic volume.
+     * @param s The side length of the cubic volume.
+     */
     void reset(Vector3 minB, double s) {
         minBounds = minB;
         size = s;
@@ -115,14 +120,24 @@ public:
         }
     }
 
+    /**
+     * @brief Inserts a body into the appropriate octant of a node.
+     * 
+     * @details
+     * The octant index (0-7) is determined using bit-masking on the coordinates:
+     * - **Bit 0 (1)**: X-axis (0: left, 1: right)
+     * - **Bit 1 (2)**: Y-axis (0: bottom, 1: top)
+     * - **Bit 2 (4)**: Z-axis (0: back, 1: front)
+     * 
+     * For example, an index of 3 (binary 011) represents (+X, +Y, -Z).
+     * 
+     * @param nodeIdx Index of parent node in pool
+     * @param body Pointer to body to insert
+     */
     void insertIntoChild(int nodeIdx, Body* body) {
         double halfSize = pool[nodeIdx].size * 0.5;
         Vector3 mid = pool[nodeIdx].minBounds + Vector3(halfSize, halfSize, halfSize);
         
-        // Determine octant (0-7) using bit-masking
-        // Bit 0: X-axis (0: left, 1: right)
-        // Bit 1: Y-axis (0: bottom, 1: top)
-        // Bit 2: Z-axis (0: back, 1: front)
         int idx = 0;
         if (body->position.x >= mid.x) idx |= 1;
         if (body->position.y >= mid.y) idx |= 2;

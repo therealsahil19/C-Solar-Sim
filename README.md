@@ -219,6 +219,24 @@ This usually happens if the timestep ($dt$) is too large for a close encounter.
 - **Fix**: Switch to **Adaptive Timestepping** in the GUI or reduce the time rate. 
 - **Physics Note**: Even with RK4, if two bodies are at the same coordinate, the force $1/r^2$ becomes infinite. Our "Softening" factor prevents $NaN$, but kinetic energy will still skyrocket.
 
+## Verification
+
+SolarSim includes a comprehensive verification suite to ensure physical accuracy and stability.
+
+### Running Tests
+```bash
+cmake -B build -D BUILD_TESTS=ON
+cmake --build build --target verify
+./build/Release/verify.exe # Windows
+```
+
+The suite validates:
+- **Energy Conservation**: Checks for drift < 0.05% per year.
+- **Momentum**: Verifies system-wide momentum conservation.
+- **Orbital Periods**: Confirms Earth completes orbit in 1.0 ± 0.1 years.
+
+For detailed documentation history and standards, see the [Scribe Journal](.jules/scribe.md).
+
 ## Contributing
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and verification procedures.

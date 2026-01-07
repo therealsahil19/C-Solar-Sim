@@ -28,6 +28,16 @@ class StateManager {
 public:
     /**
      * @brief Saves current simulation state to a CSV file.
+     * 
+     * @details
+     * **CSV Schema**:
+     * `name,mass,radius,px,py,pz,vx,vy,vz,rotAngle,rotSpeed,axialTilt`
+     * 
+     * - `mass`: Solar masses
+     * - `radius`: AU
+     * - `px/py/pz`: Position in AU (Barycentric)
+     * - `vx/vy/vz`: Velocity in AU/Year
+     * 
      * @param bodies Current body vector
      * @param filename Output filename
      * @return True if save succeeded

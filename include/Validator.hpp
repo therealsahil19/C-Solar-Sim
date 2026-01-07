@@ -123,6 +123,11 @@ public:
 
     /**
      * @brief Quick validation check for energy conservation.
+     * 
+     * @details
+     * Checks if the relative energy drift exceeds the **Scribe Standard** of 0.05% 
+     * ($\Delta E / E_0 < 5 \times 10^{-4}$).
+     * 
      * @param bodies Bodies to check
      * @param steps Number of steps to run
      * @param dt Timestep

@@ -138,12 +138,17 @@ public:
      * The timestep is scaled such that bodies moving at high speeds during close 
      * encounters are integrated with higher temporal resolution.
      * 
-     * Formula: $dt = C \cdot \sqrt{min(dist^2)}$
-     * This prevents numerical divergence during "slingshot" maneuvers.
+     * @details
+     * We calculate the minimum squared distance between any two bodies. The safe
+     * timestep is proportional to the square root of this distance (the collision time):
+     * 
+     * $$dt_{adaptive} = C \cdot \sqrt{min(r_{ij}^2)}$$
+     * 
+     * where $C$ is a safety constant (typically 0.01).
      * 
      * @param bodies Collection of celestial bodies
      * @param baseDt The maximum allowable timestep (usually configured by user)
-     * @returns A clamped timestep value
+     * @returns A clamped timestep value [baseDt * 0.01, baseDt]
      */
     static double getAdaptiveTimestep(const std::vector<Body>& bodies, double baseDt) {
         double minDistSq = 1e18;
@@ -161,13 +166,14 @@ public:
      * 
      * Verlet is a symplectic integrator, meaning it preserves phase-space volume
      * and exhibits excellent long-term energy conservation compared to non-symplectic
-     * methods like RK4.
+     * methods like Euler.
      * 
-     * Algorithm:
-     * 1. v_half = v_init + 0.5 * a_init * dt
-     * 2. p_new = p_init + v_half * dt
-     * 3. a_new = calculateAccelerations(p_new)
-     * 4. v_new = v_half + 0.5 * a_new * dt
+     * @details
+     * The algorithm follows these steps:
+     * 1. Update positions: $r(t+dt) = r(t) + v(t)dt + \frac{1}{2}a(t)dt^2$
+     * 2. Compute half-step velocity: $v(t+\frac{dt}{2}) = v(t) + \frac{1}{2}a(t)dt$
+     * 3. Compute new acceleration: $a(t+dt)$ from $r(t+dt)$
+     * 4. Compute full-step velocity: $v(t+dt) = v(t+\frac{dt}{2}) + \frac{1}{2}a(t+dt)dt$
      * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years
@@ -183,19 +189,17 @@ public:
     /**
      * @brief Integrates system state using 4th-order Runge-Kutta (RK4).
      * 
-     * RK4 provides a balance between computational cost and high-order accuracy.
-     * It samples the derivatives at four points within the timestep.
+     * RK4 provides a balance between computational cost and high-order accuracy ($O(dt^4)$).
+     * It samples the derivatives at four points within the timestep to produce a 
+     * weighted average gradient.
      * 
      * @details
-     * Let $\dot{y} = f(t, y)$ be the differential equation. The next state $y_{n+1}$ is:
-     * 1. $k_1 = f(t_n, y_n)$ - Initial slope
-     * 2. $k_2 = f(t_n + \frac{h}{2}, y_n + h\frac{k_1}{2})$ - Slope at midpoint using $k_1$
-     * 3. $k_3 = f(t_n + \frac{h}{2}, y_n + h\frac{k_2}{2})$ - Slope at midpoint using $k_2$
-     * 4. $k_4 = f(t_n + h, y_n + h k_3)$ - Slope at end using $k_3$
-     * $y_{n+1} = y_n + \frac{h}{6}(k_1 + 2k_2 + 2k_3 + k_4)$
-     * 
-     * In the N-body context, $y$ is a vector of $[positions, velocities]$.
-     * The function $f$ computes $[velocities, accelerations]$.
+     * For a state $y = [pos, vel]$ and $dy/dt = f(t, y)$:
+     * - $k_1 = f(t, y)$
+     * - $k_2 = f(t + \frac{dt}{2}, y + k_1 \frac{dt}{2})$
+     * - $k_3 = f(t + \frac{dt}{2}, y + k_2 \frac{dt}{2})$
+     * - $k_4 = f(t + dt, y + k_3 dt)$
+     * - $y(t+dt) = y(t) + \frac{dt}{6}(k_1 + 2k_2 + 2k_3 + k_4)$
      * 
      * @param bodies Collection of celestial bodies
      * @param dt Timestep in years

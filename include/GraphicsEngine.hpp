@@ -58,15 +58,23 @@ private:
     std::string shaderPath;
 
 public:
-    // Visual scale multiplier - maps real AU to visual units
-    // 
-    // @philosophy
-    // Space is mostly empty. If we rendered to scale, the Sun would be a sub-pixel
-    // speck or the planets would be light-years apart. To create a navigable
-    // simulation, we apply a "Human-Scale Map":
-    // 1. Inner Planets: Higher scale factor to keep them distinct from the Sun.
-    // 2. Outer Giants: Lower scale factor to keep the system compact enough to view.
-    // 3. Moon: Special relative scaling to keep it visible near Earth.
+    /**
+     * @brief Visual scale multiplier - maps real AU to visual units.
+     * 
+     * @philosophy
+     * **The Scaling Bridge**: Space is mostly empty. If we rendered everything to 
+     * scale, the Sun would be a sub-pixel speck and the planets would be light-years 
+     * apart on screen. To create a navigable experience, we use a **Hybrid Log-Linear 
+     * Scaling**:
+     * 
+     * 1. **Sun**: Over-scaled by ~100x to be the center-piece.
+     * 2. **Inner Planets**: Linear scaling relative to each other.
+     * 3. **Outer Giants**: Logarithmic scaling to keep the system compact enough to view.
+     * 4. **Moon**: Special relative scaling to keep it visible near Earth.
+     * 
+     * @param name Name of the celestial body
+     * @returns The visual scale factor
+     */
     static float getVisualScale(const std::string& name) {
         // Scale factors derived from: visual_distance / real_distance
         if (name == "Sun") return 1.0f;  // Origin
@@ -123,10 +131,6 @@ public:
         return earthVisualPos + (relativePos * relativeScale);
     }
     
-    // Legacy overload for backward compat within this file
-    static glm::vec3 calculateMoonVisualPosition(const Body& moon, const Body& earth) {
-        return calculateMoonVisualPosition(moon.position, earth.position, getVisualPosition(earth.position, earth.name));
-    }
 
 
 private:
@@ -379,6 +383,20 @@ private:
         drawBodyInternal(body.name, visualPos, body.axialTilt, (float)body.rotationAngle, view, projection, camPos, lightPos);
     }
 
+        /**
+     * @brief Internal rendering logic for a single celestial body.
+     * 
+     * @details
+     * Handles shader activation, uniform mapping (MVP matrices, lighting),
+     * and texture binding.
+     * 
+     * **Shader Uniforms**:
+     * - `model`, `view`, `projection`: Standard MVP matrices.
+     * - `lightPos`: Position of the Sun in visual units.
+     * - `viewPos`: Camera position for specular highlights.
+     * - `opacity`: Used for ghost/delta visualization.
+     * - `isSun`: Boolean toggle in `planet.frag` to disable shadowing on the Sun.
+     */
     void drawBodyInternal(const std::string& name, const glm::vec3& visualPos,
                           double axialTilt, float rotationAngle,
                           const glm::mat4& view, const glm::mat4& projection,
