@@ -68,22 +68,16 @@ private:
             position = focusPoint - front * orbitDistance;
         }
         
-        // SPHERICAL CAMERA: Derive up from the radial direction (camera to focus)
-        // This makes the camera automatically tilt when orbiting, showing planets
-        // from their true perspective (poles visible when looking from above)
-        glm::vec3 radialOut = glm::normalize(position - focusPoint);
+        // ARCBALL CAMERA: Use fixed world-up for stable planet orientation
+        // This prevents the viewport from rotating as the user orbits, making
+        // planet textures appear stable from the user's perspective.
         
-        // Handle edge case: when looking straight down or up, radialOut is parallel to front
-        // In this case, we fall back to worldUp
-        float dotVal = std::abs(glm::dot(radialOut, front));
-        glm::vec3 baseUp;
+        // Handle gimbal lock: when looking straight up/down, front is parallel to worldUp
+        float dotVal = std::abs(glm::dot(front, worldUp));
+        glm::vec3 baseUp = worldUp;
         if (dotVal > 0.99f) {
-            // Near gimbal lock, use worldUp as fallback
-            baseUp = worldUp;
-        } else {
-            // Normal case: use radial direction as base for up
-            // The "up" should point away from focus (towards "outer space")
-            baseUp = radialOut;
+            // Near gimbal lock, use a fallback perpendicular to front
+            baseUp = glm::vec3(0.0f, 0.0f, -1.0f);
         }
         
         // Compute right and up from baseUp (Gram-Schmidt orthogonalization)

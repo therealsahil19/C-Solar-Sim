@@ -52,13 +52,17 @@ public:
     }
 
     /**
-     * @brief Updates position and adds current position to trail.
+     * @brief Updates position and rotation.
      */
     void updatePosition(double dt) {
         position += velocity * dt;
         updateRotation(dt);
-        
-        // Update trail every few steps (simplified: every update here)
+    }
+
+    /**
+     * @brief Adds current position to trail.
+     */
+    void updateTrail() {
         trail.push_back(position);
         if (trail.size() > MAX_TRAIL_POINTS) {
             trail.pop_front();

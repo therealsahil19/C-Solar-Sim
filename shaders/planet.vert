@@ -21,7 +21,9 @@ void main()
     FragPos = vec3(finalModel * vec4(aPos, 1.0));
     
     if (isInstanced) {
-        Normal = mat3(transpose(inverse(finalModel))) * aNormal;
+        // Optimized: For uniform scaling, normal matrix simplifies to normalized mat3(model)
+        // This eliminates expensive inverse() calls per vertex
+        Normal = normalize(mat3(finalModel) * aNormal);
     } else {
         Normal = normalMatrix * aNormal;
     }

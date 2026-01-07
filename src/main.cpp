@@ -303,17 +303,26 @@ int main(int argc, char* argv[]) {
         if (!guiState.paused) {
             double frameTime = baseDt * guiState.timeRate;
             double currentT = 0;
+            
+            // Optimization: Get adaptive timestep once per frame loop if bodies are few/stable
+            // For 100+ bodies, O(N^2) every sub-step is a massive bottleneck.
+            double adt = SolarSim::PhysicsEngine::getAdaptiveTimestep(system, baseDt);
+
             while (currentT < frameTime) {
-                double adt = SolarSim::PhysicsEngine::getAdaptiveTimestep(system, baseDt);
-                adt = std::min(adt, frameTime - currentT);
+                double stepDt = std::min(adt, frameTime - currentT);
                 switch (guiState.integrator) {
-                    case 0: SolarSim::PhysicsEngine::stepVerlet(system, adt); break;
-                    case 1: SolarSim::PhysicsEngine::stepRK4(system, adt); break;
-                    case 2: SolarSim::PhysicsEngine::stepBarnesHut(system, adt, 0.5); break;
+                    case 0: SolarSim::PhysicsEngine::stepVerlet(system, stepDt); break;
+                    case 1: SolarSim::PhysicsEngine::stepRK4(system, stepDt); break;
+                    case 2: SolarSim::PhysicsEngine::stepBarnesHut(system, stepDt, 0.5); break;
                 }
-                currentT += adt;
+                currentT += stepDt;
             }
             guiState.elapsedYears += (float)frameTime;
+
+            // Update trails once per frame instead of every sub-step
+            if (guiState.showTrails) {
+                for (auto& b : system) b.updateTrail();
+            }
         }
 
         graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits);

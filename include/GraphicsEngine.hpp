@@ -29,7 +29,7 @@ class GraphicsEngine {
 private:
     sf::RenderWindow& window;
     Camera3D camera;
-    SphereRenderer sphereRenderer{64, 64};  // Higher resolution for smooth textures
+    SphereRenderer sphereRenderer{32, 32};  // Balanced quality and performance
     
     ShaderProgram planetShader;
     ShaderProgram sunShader;
@@ -47,6 +47,15 @@ private:
     
     // Orbit ellipse rendering
     unsigned int orbitVAO = 0, orbitVBO = 0;
+    
+    // Orbit path cache: avoids per-frame recalculation of orbital elements
+    // Key: body name, Value: {cached position, pre-computed vertex data, point count}
+    struct OrbitCacheEntry {
+        Vector3 cachedPosition;
+        std::vector<float> vertices;
+        size_t pointCount;
+    };
+    std::map<std::string, OrbitCacheEntry> orbitCache;
     
     // Lighting parameters
     float ambientStrength = 0.15f;
@@ -440,23 +449,28 @@ private:
         // Use visual radius from lookup
         float visualRadius = getVisualRadius(name);
         
-        // Model matrix with visual position scaling
+        // Start with Identity
         glm::mat4 model = glm::mat4(1.0f);
+
+        // 1. Position in the system (Visual units)
         model = glm::translate(model, visualPos);
-        
-        // Apply axial tilt
+
+        // 2. Local orientation (Axial Tilt)
         if (axialTilt != 0) {
             model = glm::rotate(model, glm::radians((float)axialTilt), glm::vec3(0.0f, 0.0f, 1.0f));
         }
-        
-        // Apply rotation
+
+        // 3. Local spin (Rotation)
         model = glm::rotate(model, glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
-        
-        // Scale
+
+        // 4. Local size (Scale)
         model = glm::scale(model, glm::vec3(visualRadius));
         
-        // Normal matrix for lighting
-        glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(model)));
+        // Normal matrix optimization: For uniform scaling, we can just use the model matrix.
+        // Even if we use inverse, doing it on CPU is better than per-vertex.
+        glm::mat3 normalMatrix = glm::mat3(model);
+        // If we want to be safe for non-uniform scale (which we don't have here usually):
+        // glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(model)));
         
         // Choose shader
         bool isSun = (name == "Sun");
@@ -609,42 +623,61 @@ private:
                 continue; 
             }
             
-            // Calculate orbital elements
-            OrbitalElements orbit = OrbitCalculator::calculateElements(body.position, body.velocity, mu);
-            
-            if (!orbit.isValid) continue;
-            
-            // Generate orbit path (64 points for smooth ellipse)
-            std::vector<Vector3> orbitPoints = OrbitCalculator::generateOrbitPath(orbit, 64);
-            
-            if (orbitPoints.size() < 2) continue;
-            
-            // Get body color
+            // Get body color (needed for cache generation)
             sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
             
-            // Build orbit vertices with semi-transparent color and visual scaling
-            std::vector<float> vertices;
-            for (const auto& pt : orbitPoints) {
-                glm::vec3 visualPt = getVisualPosition(pt, body.name);
-                vertices.push_back(visualPt.x);
-                vertices.push_back(visualPt.y);  // Y-up convention handled by getVisualPosition
-                vertices.push_back(visualPt.z);
-                vertices.push_back(sfColor.r / 255.0f);
-                vertices.push_back(sfColor.g / 255.0f);
-                vertices.push_back(sfColor.b / 255.0f);
-                vertices.push_back(0.3f);  // Semi-transparent
+            // Check orbit cache - only recalculate if position changed significantly
+            std::vector<float>* vertices = nullptr;
+            size_t pointCount = 0;
+            
+            auto cacheIt = orbitCache.find(body.name);
+            bool cacheValid = (cacheIt != orbitCache.end()) && 
+                              ((body.position - cacheIt->second.cachedPosition).length() < 0.1);
+            
+            if (cacheValid) {
+                // Use cached orbit path
+                vertices = &cacheIt->second.vertices;
+                pointCount = cacheIt->second.pointCount;
+            } else {
+                // Calculate orbital elements and generate path
+                OrbitalElements orbit = OrbitCalculator::calculateElements(body.position, body.velocity, mu);
+                if (!orbit.isValid) continue;
+                
+                std::vector<Vector3> orbitPoints = OrbitCalculator::generateOrbitPath(orbit, 64);
+                if (orbitPoints.size() < 2) continue;
+                
+                // Build orbit vertices with semi-transparent color and visual scaling
+                OrbitCacheEntry entry;
+                entry.cachedPosition = body.position;
+                entry.pointCount = orbitPoints.size();
+                entry.vertices.reserve(orbitPoints.size() * 7);
+                
+                for (const auto& pt : orbitPoints) {
+                    glm::vec3 visualPt = getVisualPosition(pt, body.name);
+                    entry.vertices.push_back(visualPt.x);
+                    entry.vertices.push_back(visualPt.y);
+                    entry.vertices.push_back(visualPt.z);
+                    entry.vertices.push_back(sfColor.r / 255.0f);
+                    entry.vertices.push_back(sfColor.g / 255.0f);
+                    entry.vertices.push_back(sfColor.b / 255.0f);
+                    entry.vertices.push_back(0.3f);
+                }
+                
+                orbitCache[body.name] = std::move(entry);
+                vertices = &orbitCache[body.name].vertices;
+                pointCount = orbitCache[body.name].pointCount;
             }
             
             glBindVertexArray(orbitVAO);
             glBindBuffer(GL_ARRAY_BUFFER, orbitVBO);
-            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, vertices->size() * sizeof(float), vertices->data(), GL_DYNAMIC_DRAW);
             
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void*)(3 * sizeof(float)));
             glEnableVertexAttribArray(1);
             
-            glDrawArrays(GL_LINE_LOOP, 0, (GLsizei)orbitPoints.size());
+            glDrawArrays(GL_LINE_LOOP, 0, (GLsizei)pointCount);
         }
     }
 public:
