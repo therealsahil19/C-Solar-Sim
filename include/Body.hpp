@@ -44,7 +44,8 @@ public:
      */
     void updateRotation(double dt) {
         rotationAngle += rotationSpeed * dt;
-        while (rotationAngle >= 360.0) rotationAngle -= 360.0;
+        rotationAngle = std::fmod(rotationAngle, 360.0);
+        if (rotationAngle < 0.0) rotationAngle += 360.0;
     }
 
     /**

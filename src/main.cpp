@@ -11,7 +11,6 @@
 #include "SystemData.hpp"
 #include "GuiEngine.hpp"
 #include "StateManager.hpp"
-#include "StateManager.hpp"
 
 #include <filesystem>
 

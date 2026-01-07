@@ -450,7 +450,6 @@ private:
             sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
             
             // Build trail vertices with fading alpha and visual scaling
-            float scale = getVisualScale(body.name);
             std::vector<float> vertices;
             for (size_t i = 0; i < body.trail.size(); ++i) {
                 float alpha = 0.4f * (float)i / (float)body.trail.size();
@@ -566,7 +565,6 @@ private:
             sf::Color sfColor = bodyColors.count(body.name) ? bodyColors.at(body.name) : sf::Color::White;
             
             // Build orbit vertices with semi-transparent color and visual scaling
-            float scale = getVisualScale(body.name);
             std::vector<float> vertices;
             for (const auto& pt : orbitPoints) {
                 glm::vec3 visualPt = getVisualPosition(pt, body.name);

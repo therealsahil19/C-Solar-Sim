@@ -206,13 +206,8 @@ public:
      */
     static void stepRK4(std::vector<Body>& bodies, double dt) {
         size_t n = bodies.size();
-        static std::vector<Vector3> kp, kv, p, v, a, tmp_p;
-        static std::vector<double> m;
-        
-        if (kp.size() != n) {
-            kp.resize(n); kv.resize(n); p.resize(n); 
-            v.resize(n); a.resize(n); tmp_p.resize(n); m.resize(n);
-        }
+        std::vector<Vector3> kp(n), kv(n), p(n), v(n), a(n), tmp_p(n);
+        std::vector<double> m(n);
 
         for(size_t i=0; i<n; ++i) { p[i] = bodies[i].position; v[i] = bodies[i].velocity; m[i] = bodies[i].mass; }
 
@@ -228,11 +223,7 @@ public:
             }
         };
 
-        static std::vector<Vector3> k1_v, k1_a, k2_v, k2_a, k3_v, k3_a, k4_v, k4_a;
-        if (k1_v.size() != n) {
-            k1_v.resize(n); k1_a.resize(n); k2_v.resize(n); k2_a.resize(n);
-            k3_v.resize(n); k3_a.resize(n); k4_v.resize(n); k4_a.resize(n);
-        }
+        std::vector<Vector3> k1_v(n), k1_a(n), k2_v(n), k2_a(n), k3_v(n), k3_a(n), k4_v(n), k4_a(n);
 
         getA(p, k1_a); for(size_t i=0; i<n; ++i) k1_v[i] = v[i];
         for(size_t i=0; i<n; ++i) tmp_p[i] = p[i] + k1_v[i] * (dt*0.5);

@@ -93,17 +93,22 @@ public:
             }
 
             if (tokens.size() >= 12) {
-                Body body(
-                    tokens[0],                           // name
-                    std::stod(tokens[1]),                // mass
-                    std::stod(tokens[2]),                // radius
-                    Vector3(std::stod(tokens[3]), std::stod(tokens[4]), std::stod(tokens[5])),  // position
-                    Vector3(std::stod(tokens[6]), std::stod(tokens[7]), std::stod(tokens[8]))   // velocity
-                );
-                body.rotationAngle = std::stod(tokens[9]);
-                body.rotationSpeed = std::stod(tokens[10]);
-                body.axialTilt = std::stod(tokens[11]);
-                bodies.push_back(body);
+                try {
+                    Body body(
+                        tokens[0],                           // name
+                        std::stod(tokens[1]),                // mass
+                        std::stod(tokens[2]),                // radius
+                        Vector3(std::stod(tokens[3]), std::stod(tokens[4]), std::stod(tokens[5])),  // position
+                        Vector3(std::stod(tokens[6]), std::stod(tokens[7]), std::stod(tokens[8]))   // velocity
+                    );
+                    body.rotationAngle = std::stod(tokens[9]);
+                    body.rotationSpeed = std::stod(tokens[10]);
+                    body.axialTilt = std::stod(tokens[11]);
+                    bodies.push_back(body);
+                } catch (const std::exception& e) {
+                    std::cerr << "Warning: Skipping malformed line in " << filename 
+                              << ": " << e.what() << std::endl;
+                }
             }
         }
 

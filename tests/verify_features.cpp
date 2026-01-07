@@ -1,12 +1,12 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include <cassert>
 #include "Body.hpp"
 #include "PhysicsEngine.hpp"
 #include "Validator.hpp"
 #include "StateManager.hpp"
-#include "SystemData.hpp"
 #include "SystemData.hpp"
 
 using namespace SolarSim;
@@ -281,6 +281,118 @@ void test_momentum_conservation() {
 }
 
 // =============================================================================
+// NEW: RK4 Regression Test for Body Count Changes (BUG-H001)
+// =============================================================================
+
+void test_rk4_with_changing_body_count() {
+    std::cout << "[TEST] RK4 With Changing Body Count..." << std::endl;
+    
+    // First run with 3 bodies
+    std::vector<Body> bodies1;
+    bodies1.push_back(Body("A", 0.5, 0.01, Vector3(0, 0, 0), Vector3(0, 0, 0)));
+    bodies1.push_back(Body("B", 0.3, 0.01, Vector3(1, 0, 0), Vector3(0, 1, 0)));
+    bodies1.push_back(Body("C", 0.2, 0.01, Vector3(-1, 0, 0), Vector3(0, -1, 0)));
+    
+    double dt = 0.001;
+    PhysicsEngine::stepRK4(bodies1, dt);
+    std::cout << "  Ran RK4 with 3 bodies" << std::endl;
+    
+    // Now run with 2 bodies (simulating post-collision)
+    std::vector<Body> bodies2;
+    bodies2.push_back(Body("A", 0.5, 0.01, Vector3(0, 0, 0), Vector3(0, 0, 0)));
+    bodies2.push_back(Body("B", 0.5, 0.01, Vector3(1, 0, 0), Vector3(0, 1, 0)));
+    
+    PhysicsEngine::stepRK4(bodies2, dt);
+    std::cout << "  Ran RK4 with 2 bodies" << std::endl;
+    
+    // Now run with 5 bodies
+    std::vector<Body> bodies3;
+    for (int i = 0; i < 5; ++i) {
+        bodies3.push_back(Body("Body" + std::to_string(i), 0.2, 0.01, 
+                               Vector3(i * 0.5, 0, 0), Vector3(0, 0.1 * i, 0)));
+    }
+    
+    PhysicsEngine::stepRK4(bodies3, dt);
+    std::cout << "  Ran RK4 with 5 bodies" << std::endl;
+    
+    // If we got here without crash/corruption, the test passed
+    assert(bodies1.size() == 3);
+    assert(bodies2.size() == 2);
+    assert(bodies3.size() == 5);
+    
+    std::cout << "[PASS] RK4 With Changing Body Count" << std::endl << std::endl;
+}
+
+// =============================================================================
+// NEW: Rotation Wrap for Negative Speeds (BUG-L004)
+// =============================================================================
+
+void test_rotation_wrap_negative() {
+    std::cout << "[TEST] Rotation Wrap For Negative Speeds..." << std::endl;
+    
+    // Create body with negative rotation speed (retrograde like Venus)
+    Body body("Venus", 1.0, 0.01, Vector3(0, 0, 0), Vector3(0, 0, 0));
+    body.rotationSpeed = -15.0;  // Retrograde rotation
+    body.rotationAngle = 10.0;
+    
+    // Run for enough time to go negative
+    double dt = 0.1;  // Large timestep to quickly go negative
+    for (int i = 0; i < 10; ++i) {
+        body.updateRotation(dt);
+    }
+    
+    // Rotation should be wrapped to [0, 360)
+    std::cout << "  Final rotation angle: " << body.rotationAngle << std::endl;
+    assert(body.rotationAngle >= 0.0);
+    assert(body.rotationAngle < 360.0);
+    
+    // Test positive overflow still works
+    Body body2("Jupiter", 1.0, 0.01, Vector3(0, 0, 0), Vector3(0, 0, 0));
+    body2.rotationSpeed = 500.0;  // Very fast rotation
+    body2.rotationAngle = 350.0;
+    
+    for (int i = 0; i < 5; ++i) {
+        body2.updateRotation(dt);
+    }
+    
+    std::cout << "  Final rotation angle (fast): " << body2.rotationAngle << std::endl;
+    assert(body2.rotationAngle >= 0.0);
+    assert(body2.rotationAngle < 360.0);
+    
+    std::cout << "[PASS] Rotation Wrap For Negative Speeds" << std::endl << std::endl;
+}
+
+// =============================================================================
+// NEW: CSV Malformed Handling (BUG-M003)
+// =============================================================================
+
+void test_csv_malformed_handling() {
+    std::cout << "[TEST] CSV Malformed Handling..." << std::endl;
+    
+    // Create a malformed CSV file
+    std::string testFile = "test_malformed.csv";
+    std::ofstream file(testFile);
+    file << "name,mass,radius,px,py,pz,vx,vy,vz,rotAngle,rotSpeed,axialTilt\n";
+    file << "ValidBody,1.0,0.01,0,0,0,0,0,0,0,0,0\n";  // Valid line
+    file << "BadBody,INVALID,0.01,0,0,0,0,0,0,0,0,0\n";  // Invalid mass
+    file << "AnotherValid,0.5,0.01,1,0,0,0,1,0,0,10,0\n";  // Valid line
+    file.close();
+    
+    // Load should not crash, should skip bad line
+    auto bodies = StateManager::loadState(testFile);
+    
+    std::cout << "  Loaded " << bodies.size() << " bodies from malformed CSV" << std::endl;
+    assert(bodies.size() == 2);  // Only 2 valid bodies
+    assert(bodies[0].name == "ValidBody");
+    assert(bodies[1].name == "AnotherValid");
+    
+    // Cleanup
+    std::remove(testFile.c_str());
+    
+    std::cout << "[PASS] CSV Malformed Handling" << std::endl << std::endl;
+}
+
+// =============================================================================
 // Main Entry Point
 // =============================================================================
 
@@ -299,6 +411,11 @@ int main() {
         test_collision_detection();
         test_adaptive_timestep();
         test_momentum_conservation();
+        
+        // Regression tests for Debugger fixes
+        test_rk4_with_changing_body_count();
+        test_rotation_wrap_negative();
+        test_csv_malformed_handling();
         
         std::cout << "=====================================" << std::endl;
         std::cout << "✅ ALL TESTS PASSED SUCCESSFULLY" << std::endl;

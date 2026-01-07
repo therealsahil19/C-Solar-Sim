@@ -1,5 +1,13 @@
 # BugHunter's Journal - Bug Log
 
+## 2026-01-07 - [Full Codebase Comprehensive Scan]
+**Scope:** All core headers (PhysicsEngine, GraphicsEngine, GuiEngine, Octree, Camera3D, Body, Vector3, StateManager, Validator, Constants), main.cpp, shaders, verify_features.cpp
+**Found:** 0 Critical, 3 High, 6 Medium, 8 Low
+**Notable:** Static vectors in RK4 integrator create thread-safety issues (BUG-H001); duplicate includes in main.cpp and verify_features.cpp; rotation wrap only handles positive overflow
+**Coverage Notes:** No tests for CSV parsing errors, shader compilation, gimbal lock edge cases, or mission mode complete flow
+
+---
+
 ## 2026-01-07 - [GUI & Graphics Deep Scan]
 **Scope:** include/GuiEngine.hpp, include/GraphicsEngine.hpp, include/Octree.hpp
 **Found:** 1 Critical, 3 High, 5 Medium, 4 Low

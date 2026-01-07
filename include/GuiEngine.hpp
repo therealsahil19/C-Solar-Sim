@@ -287,7 +287,7 @@ public:
         ImGui::SetNextItemWidth(-1);
         
         char formatBuf[32];
-        sprintf_s(formatBuf, "Time Rate: %.1fx", allowedRates[currentIndex]);
+        snprintf(formatBuf, sizeof(formatBuf), "Time Rate: %.1fx", allowedRates[currentIndex]);
         
         if (ImGui::SliderInt("##TimeRate", &currentIndex, 0, numRates - 1, formatBuf)) {
             state.timeRate = allowedRates[currentIndex];
