@@ -77,6 +77,7 @@ public:
         // Theme & Visual Settings
         bool isLoading = false;         ///< Is a long-running process (like preset loading) active?
         float loadingProgress = 0.0f;   ///< Progress percentage [0..1]
+        float lastVisibilityHeight = 0.0f; ///< Vertical height of visibility panel for layout
     };
 
     static SimulationState& getState() {
@@ -307,14 +308,17 @@ public:
      * @brief Render Visibility panel (top-right, fixed position).
      */
     static void renderVisibilityPanel(SimulationState& state) {
-        if (!state.showVisibility) return;
+        if (!state.showVisibility) {
+            state.lastVisibilityHeight = 0.0f;
+            return;
+        }
         
+        const float PANEL_WIDTH = 270.0f;
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 panelSize(260, 240);
-        ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 10);
+        ImVec2 panelPos(viewport->WorkSize.x - PANEL_WIDTH - 10, 10);
         
         ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(PANEL_WIDTH, 0), ImGuiCond_Always);
         
         ImGui::Begin("Visibility", &state.showVisibility,
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
@@ -326,6 +330,7 @@ public:
         ImGui::Checkbox("Other Orbits", &state.showOtherOrbits);
         ImGui::Checkbox("Asteroids", &state.showAsteroids);
 
+        state.lastVisibilityHeight = ImGui::GetWindowHeight();
         ImGui::End();
     }
 
@@ -335,24 +340,28 @@ public:
     static void renderBodyInfoPanel(const std::vector<Body>& bodies, SimulationState& state) {
         if (!state.showBodyInfo) return;
         
+        const float PANEL_WIDTH = 270.0f;
+        const float GAP = 10.0f;
+        
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 panelSize(260, 360);
-        // Position below visibility panel with gap (10 + 240 + 10)
-        ImVec2 panelPos(viewport->WorkSize.x - panelSize.x - 10, 260);
+        // Position below visibility panel with gap
+        float yPos = 10.0f + (state.lastVisibilityHeight > 0 ? state.lastVisibilityHeight + GAP : 0.0f);
+        ImVec2 panelPos(viewport->WorkSize.x - PANEL_WIDTH - 10, yPos);
         
         ImGui::SetNextWindowPos(panelPos, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(panelSize, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(PANEL_WIDTH, 0), ImGuiCond_Always);
         
         ImGui::Begin("Body Information", &state.showBodyInfo,
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
         
         // A11y: Keyboard navigation hints
-        ImGui::TextDisabled("Use Up/Down arrows to navigate");
-        
-        if (ImGui::BeginCombo("##SelectBody", 
-            state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
-                ? bodies[state.selectedBody].name.c_str() : "(none)")) {
+    ImGui::TextDisabled("Use Up/Down arrows to navigate");
+    
+    ImGui::SetNextItemWidth(-80);
+    if (ImGui::BeginCombo("##SelectBody", 
+        state.selectedBody >= 0 && state.selectedBody < (int)bodies.size() 
+            ? bodies[state.selectedBody].name.c_str() : "(none)")) {
             
             for (int i = 0; i < (int)bodies.size(); ++i) {
                 if (bodies[i].name == "Asteroid") continue;
@@ -489,9 +498,10 @@ public:
                           (toast.type == ToastType::Warning) ? Theme::Warning :
                           (toast.type == ToastType::Error)   ? Theme::Error : Theme::Info;
 
-            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - padding, 
-                                           viewport->WorkPos.y + yOffset), 
-                                    ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+        // Position toasts in the top-middle
+        ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x / 2.0f, 
+                                       viewport->WorkPos.y + yOffset), 
+                                ImGuiCond_Always, ImVec2(0.5f, 0.0f));
             
             std::string id = "##toast" + std::to_string(&toast - &state.toasts[0]);
             ImGui::Begin(id.c_str(), nullptr, 
