@@ -300,7 +300,6 @@ public:
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
         
-        ImGui::Spacing();
         ImGui::Checkbox("Orbital Trails (T)", &state.showTrails);
         ImGui::Checkbox("Orbital Labels", &state.showLabels);
         ImGui::Checkbox("Planet Orbits", &state.showPlanetOrbits);
