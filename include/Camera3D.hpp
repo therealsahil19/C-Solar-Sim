@@ -57,6 +57,9 @@ private:
     int lastMouseY = 0;
 
     void updateCameraVectors() {
+        // Normalize yaw to prevent floating point precision loss at large values
+        yaw = std::fmod(yaw, 360.0f);
+
         glm::vec3 newFront;
         newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
         newFront.y = sin(glm::radians(pitch));
@@ -118,7 +121,35 @@ public:
     }
 
     glm::mat4 getViewMatrix() const {
-        return glm::lookAt(position, position + front, up);
+        // Pole-safe view matrix: avoid gimbal lock when looking straight up/down
+        //
+        // At high pitch (|pitch| > ~85°), 'front' becomes nearly parallel to worldUp
+        // causing glm::lookAt to produce unstable or degenerate view matrices.
+        // Solution: use a forward-facing vector as the up hint near the poles.
+        
+        glm::vec3 viewUp;
+        const float polePitchThreshold = 85.0f;
+        
+        if (pitch > polePitchThreshold) {
+            // Looking up (camera below, looking at sky) - use -Z as up
+            viewUp = glm::vec3(0.0f, 0.0f, -1.0f);
+        } else if (pitch < -polePitchThreshold) {
+            // Looking down (camera above, looking at ground) - use +Z as up
+            viewUp = glm::vec3(0.0f, 0.0f, 1.0f);
+        } else {
+            // Normal case: use world up
+            viewUp = worldUp;
+        }
+        
+        // Apply explicit roll if requested (middle mouse drag)
+        if (roll != 0.0f) {
+            glm::vec3 tempRight = glm::normalize(glm::cross(front, viewUp));
+            float cosRoll = cos(glm::radians(roll));
+            float sinRoll = sin(glm::radians(roll));
+            viewUp = viewUp * cosRoll + tempRight * sinRoll;
+        }
+        
+        return glm::lookAt(position, position + front, viewUp);
     }
 
     glm::mat4 getProjectionMatrix(float aspectRatio) const {

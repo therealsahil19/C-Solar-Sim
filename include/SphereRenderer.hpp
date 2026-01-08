@@ -128,6 +128,9 @@ public:
     void draw() const {
         if (!initialized) return;
         glBindVertexArray(VAO);
+        // Explicitly re-bind VBO to ensure attribute 0 reads from correct buffer
+        // (protects against external code modifying the VAO's buffer bindings)
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }

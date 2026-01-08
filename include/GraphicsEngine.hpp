@@ -62,6 +62,9 @@ private:
     float specularStrength = 0.3f;
     float shininess = 32.0f;
     
+    // Debug mode for UV visualization
+    bool debugUV = false;
+    
     bool initialized = false;
     std::string shaderPath;
 
@@ -307,7 +310,8 @@ public:
         camera.handleEvent(event);
     }
 
-    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false) {
+    void render(const std::vector<Body>& bodies, bool showTrails = true, bool showPlanetOrbits = true, bool showOtherOrbits = false, bool debugUVMode = false) {
+        debugUV = debugUVMode;  // Store for use in drawBodyInternal
         if (!initialized) {
             if (!init()) return;
         }
@@ -482,6 +486,7 @@ private:
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
         shader.setVec3("objectColor", color);
+        shader.setBool("isInstanced", false);  // Ensure non-instanced mode
         
         // Check for texture
         bool hasTexture = glTextures.count(name) > 0;
@@ -501,6 +506,7 @@ private:
             shader.setFloat("ambientStrength", ambientStrength);
             shader.setFloat("specularStrength", specularStrength);
             shader.setFloat("shininess", shininess);
+            shader.setBool("debugUV", debugUV);
         }
         
         sphereRenderer.draw();
@@ -564,10 +570,12 @@ private:
         planetShader.setFloat("shininess", shininess);
 
         // Update instance data
+        // IMPORTANT: Bind VAO first, THEN the instance VBO, then set up instance attributes.
+        // This ensures instance matrix reads from asteroidInstanceVBO, not the sphere VBO.
+        sphereRenderer.bindVAO();
+        
         glBindBuffer(GL_ARRAY_BUFFER, asteroidInstanceVBO);
         glBufferData(GL_ARRAY_BUFFER, asteroidMatrices.size() * sizeof(glm::mat4), asteroidMatrices.data(), GL_DYNAMIC_DRAW);
-
-        sphereRenderer.bindVAO();
         
         // Set up instance matrix attributes (location 3)
         // A mat4 takes 4 attribute slots

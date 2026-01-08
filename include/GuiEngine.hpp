@@ -54,6 +54,7 @@ public:
         bool showOtherOrbits = false;///< Toggle for other bodies (Pluto, Moons, etc)
         float elapsedYears = 0.0f;  ///< Relative simulation time in years
         int fps = 0;                ///< Monitored frames per second
+        bool debugUV = false;       ///< Debug mode: visualize UV coordinates as RGB
         
         // Body selection
         int selectedBody = 0;           ///< Index of the currently focused body
@@ -334,6 +335,9 @@ public:
         ImGui::Checkbox("Planet Orbits", &state.showPlanetOrbits);
         ImGui::Checkbox("Other Orbits", &state.showOtherOrbits);
         ImGui::Checkbox("Asteroids", &state.showAsteroids);
+        ImGui::Separator();
+        ImGui::Checkbox("Debug UV", &state.debugUV);
+        ImGui::SetItemTooltip("Show UV coordinates as Red/Green. If stable, UVs are fixed.");
 
         state.lastVisibilityHeight = ImGui::GetWindowHeight();
         ImGui::End();

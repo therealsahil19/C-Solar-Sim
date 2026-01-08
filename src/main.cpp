@@ -325,7 +325,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits);
+        graphics.render(system, guiState.showTrails, guiState.showPlanetOrbits, guiState.showOtherOrbits, guiState.debugUV);
         SolarSim::GuiEngine::renderLabels(system, graphics.getViewProjectionMatrix(), window.getSize());
         SolarSim::GuiEngine::render(system, scalePtr, rotXPtr, rotZPtr);
         SolarSim::GuiEngine::display(window);

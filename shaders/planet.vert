@@ -8,6 +8,9 @@ layout (location = 3) in mat4 aInstanceMatrix; // For instanced rendering
 out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
+out vec3 LocalPos; // Added for procedural UV mapping
+flat out vec3 ModelYAxis; // Debug: Y column of model matrix
+
 
 uniform mat4 model;
 uniform mat4 view;
@@ -29,5 +32,7 @@ void main()
     }
     
     TexCoord = aTexCoord;
+    LocalPos = aPos; // Pass local coordinates
+    ModelYAxis = vec3(finalModel[1]); // Y column of model matrix
     gl_Position = projection * view * vec4(FragPos, 1.0);
 }
